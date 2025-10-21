@@ -39,68 +39,64 @@ import java.util.stream.Collectors;
 public class SecurityConfig {
 
     /**
-     * Cambia esto a false en PRODUCCIÓN para exigir JWT.
-     * En dev lo dejamos true para no romper tu app actual mientras migras el login.
+     * ⚙️ Si es true → no se exige JWT (modo Render o desarrollo)
+     * ⚙️ Si es false → exige JWT en endpoints no públicos
      */
     @Value("${app.security.permit-all:true}")
     private boolean permitAll;
 
-    /** Secret para firmar/verificar JWT (HS256). Coloca un valor robusto por env/properties. */
+    /** 🔐 Llave para firmar/verificar JWT */
     @Value("${app.jwt.secret:dev-secret-please-change-and-set-env}")
     private String jwtSecret;
 
-    /** (Opcional) issuer a verificar si lo quieres usar; si vacío, no valida issuer. */
+    /** (Opcional) Issuer del token */
     @Value("${app.jwt.issuer:}")
     private String jwtIssuer;
 
-    /** Rutas públicas (permitAll) siempre accesibles. Ajusta a tus necesidades. */
+    /** Endpoints siempre públicos */
     private static final String[] PUBLIC_ENDPOINTS = {
             "/auth/**",
-            // deja temporalmente abierto para login actual por email
             "/usuarios/email/**",
-            // salud / docs opcional
             "/actuator/health",
             "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html"
     };
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        // Para almacenar/verificar contraseñas con hash seguro
         return new BCryptPasswordEncoder();
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        // Config básica
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        // Configuración general
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
-        // Autorización
         if (permitAll) {
-            // Modo desarrollo: todo abierto (no rompe tu app actual)
+            // 🔓 Modo libre (Render / desarrollo)
             http.authorizeHttpRequests(reg -> reg
-                    .requestMatchers("/**").permitAll()
                     .anyRequest().permitAll()
             );
         } else {
-            // Modo producción: exige JWT en todo, excepto en lo público
+            // 🔐 Modo seguro (producción real)
             http.authorizeHttpRequests(reg -> reg
                     .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                     .anyRequest().authenticated()
             );
-            // Filtro de validación JWT (solo lectura del token)
+            // Agrega validación JWT
             http.addFilterBefore(new JwtAuthFilter(jwtSecret, jwtIssuer), UsernamePasswordAuthenticationFilter.class);
         }
+
+        // Evitar problemas con iframes / H2-console, etc.
+        http.headers(headers -> headers.frameOptions(frame -> frame.disable()));
 
         return http.build();
     }
 
     /**
-     * Filtro simple para validar Bearer JWT y poblar SecurityContext.
-     * No crea endpoints ni servicios nuevos: solo confía en tokens existentes.
-     * Espera un claim "roles" como lista de strings (p.ej. ["ROLE_ADMINISTRADOR"]).
+     * 🧩 Filtro JWT: valida el Bearer token y autentica al usuario
      */
     static class JwtAuthFilter extends org.springframework.web.filter.OncePerRequestFilter {
         private final SecretKey key;
@@ -114,9 +110,12 @@ public class SecurityConfig {
         @Override
         protected void doFilterInternal(HttpServletRequest request,
                                         HttpServletResponse response,
-                                        FilterChain filterChain) throws ServletException, IOException {
+                                        FilterChain filterChain)
+                throws ServletException, IOException {
 
             String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
+
+            // Si no hay token, continuar sin autenticación
             if (!StringUtils.hasText(authHeader) || !authHeader.startsWith("Bearer ")) {
                 filterChain.doFilter(request, response);
                 return;
@@ -140,7 +139,6 @@ public class SecurityConfig {
                     throw new RuntimeException("Missing subject");
                 }
 
-                // roles como claim opcional
                 Object rolesClaim = claims.get("roles");
                 Collection<SimpleGrantedAuthority> authorities = toAuthorities(rolesClaim);
 
@@ -154,7 +152,7 @@ public class SecurityConfig {
                         .getContext().setAuthentication(authentication);
 
             } catch (Exception ex) {
-                // Token inválido → sin autenticación
+                // Token inválido o expirado → sin autenticación
                 org.springframework.security.core.context.SecurityContextHolder.clearContext();
             }
 
