@@ -10,10 +10,15 @@ import com.fisio.fisio.repository.UsuarioRepository;
 import com.fisio.fisio.repository.VerificationCodeRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -23,16 +28,19 @@ public class SignupService {
     private final VerificationCodeRepository verificationRepo;
     private final UsuarioRepository usuarioRepository;
     private final EmailService emailService;
+    private final PlatformTransactionManager txManager;
 
     @Value("${app.signup.code.expiration-minutes:10}")
     private int expirationMinutes;
 
     public SignupService(VerificationCodeRepository verificationRepo,
                          UsuarioRepository usuarioRepository,
-                         EmailService emailService) {
+                         EmailService emailService,
+                         PlatformTransactionManager txManager) {
         this.verificationRepo = verificationRepo;
         this.usuarioRepository = usuarioRepository;
         this.emailService = emailService;
+        this.txManager = txManager;
     }
 
     private String normalizeEmail(String raw) {
@@ -44,7 +52,7 @@ public class SignupService {
         return String.format("%06d", n);
     }
 
-    /* ===================== SIGNUP EXISTENTE ===================== */
+    /* ===================== SIGNUP ===================== */
 
     @Transactional
     public void start(StartSignupRequest req) {
@@ -54,8 +62,7 @@ public class SignupService {
             throw new IllegalArgumentException("El email ya está registrado");
         }
 
-        verificationRepo.markAllUnusedAsUsedForEmail(email);
-
+        // NO hacer UPDATE masivo aquí. Sólo insertamos nuevo código:
         String code = generateCode();
         VerificationCode v = new VerificationCode(
                 email,
@@ -64,8 +71,12 @@ public class SignupService {
         );
         v.setUsed(false);
         v.setAttempts(0);
-        verificationRepo.save(v);
+        v = verificationRepo.save(v);
 
+        // Limpieza de códigos anteriores en una tx separada, rápida:
+        invalidateOldAsync(email, v.getId());
+
+        // Enviar correo fuera de cualquier tx larga
         emailService.sendVerificationCode(email, code);
     }
 
@@ -74,19 +85,33 @@ public class SignupService {
         String email = normalizeEmail(req.getEmail());
         String code = req.getCode() == null ? "" : req.getCode().trim();
 
-        VerificationCode v = verificationRepo
-                .findTopByEmailAndUsedFalseAndExpiresAtAfterOrderByIdDesc(
-                        email, LocalDateTime.now(ZoneId.of("UTC")))
-                .orElseThrow(() -> new IllegalArgumentException("Primero solicita un código"));
+        // Bloquea SÓLO el último sin usar (fail-fast)
+        var page1 = PageRequest.of(0, 1);
+        List<VerificationCode> locked = verificationRepo.lockLatestUnusedByEmail(email, page1);
+        if (locked.isEmpty()) {
+            throw new IllegalArgumentException("Primero solicita un código");
+        }
 
-        if (!v.getCode().equals(code)) {
-            v.setAttempts(v.getAttempts() + 1);
-            verificationRepo.save(v);
+        VerificationCode latest = locked.get(0);
+
+        // Expiración
+        if (latest.getExpiresAt().isBefore(LocalDateTime.now(ZoneId.of("UTC")))) {
+            // marcarlo usado para no volver a servirlo
+            verificationRepo.markUsedById(latest.getId());
+            throw new IllegalArgumentException("El código ha expirado");
+        }
+
+        if (!latest.getCode().equals(code)) {
+            latest.setAttempts(latest.getAttempts() + 1);
+            verificationRepo.save(latest); // no bloquea otras filas
             throw new IllegalArgumentException("Código incorrecto");
         }
 
-        v.setUsed(true);
-        verificationRepo.save(v);
+        // Marca usado por id (1 fila)
+        int updated = verificationRepo.markUsedById(latest.getId());
+        if (updated != 1) {
+            throw new IllegalStateException("No se pudo confirmar el código, intenta de nuevo");
+        }
     }
 
     @Transactional
@@ -108,13 +133,14 @@ public class SignupService {
         u.setNombre(req.getNombre().trim());
         u.setEdad(req.getEdad());
         u.setEmail(email);
-        u.setContra(req.getContra()); // TODO: hash en producción
+        u.setContra(req.getContra()); // TODO: hashear en producción
         u.setFoto(req.getFoto());
         u.setProfesion(req.getProfesion());
 
         Usuario saved = usuarioRepository.save(u);
 
-        verificationRepo.markAllUnusedAsUsedForEmail(email);
+        // Invalidar cualquier pendiente restante (no crítico, pero deja limpio)
+        invalidateOldAsync(email, null);
 
         UsuarioDTO dto = new UsuarioDTO();
         dto.setIdUsuario(saved.getIdUsuario());
@@ -128,11 +154,8 @@ public class SignupService {
         return dto;
     }
 
-    /* ===================== CAMBIO DE EMAIL NUEVO ===================== */
+    /* ===================== CAMBIO DE EMAIL ===================== */
 
-    /**
-     * Paso 1: inicia cambio de correo. Envía código al NUEVO email.
-     */
     @Transactional
     public void startEmailChange(Integer idUsuario, String newEmailRaw) {
         String newEmail = normalizeEmail(newEmailRaw);
@@ -147,9 +170,6 @@ public class SignupService {
             throw new IllegalArgumentException("El email ya está en uso por otra cuenta");
         }
 
-        // Invalidar códigos pendientes para ese nuevo email
-        verificationRepo.markAllUnusedAsUsedForEmail(newEmail);
-
         String code = generateCode();
         VerificationCode v = new VerificationCode(
                 newEmail,
@@ -158,37 +178,43 @@ public class SignupService {
         );
         v.setUsed(false);
         v.setAttempts(0);
-        verificationRepo.save(v);
+        v = verificationRepo.save(v);
+
+        invalidateOldAsync(newEmail, v.getId());
 
         emailService.sendEmailChangeCode(newEmail, code);
     }
 
-    /**
-     * Paso 2: verificar el código recibido en el NUEVO email.
-     */
     @Transactional
     public void verifyEmailChange(String newEmailRaw, String codeRaw) {
         String newEmail = normalizeEmail(newEmailRaw);
         String code = codeRaw == null ? "" : codeRaw.trim();
 
-        VerificationCode v = verificationRepo
-                .findTopByEmailAndUsedFalseAndExpiresAtAfterOrderByIdDesc(
-                        newEmail, LocalDateTime.now(ZoneId.of("UTC")))
-                .orElseThrow(() -> new IllegalArgumentException("Primero solicita un código"));
+        var page1 = PageRequest.of(0, 1);
+        List<VerificationCode> locked = verificationRepo.lockLatestUnusedByEmail(newEmail, page1);
+        if (locked.isEmpty()) {
+            throw new IllegalArgumentException("Primero solicita un código");
+        }
 
-        if (!v.getCode().equals(code)) {
-            v.setAttempts(v.getAttempts() + 1);
-            verificationRepo.save(v);
+        VerificationCode latest = locked.get(0);
+
+        if (latest.getExpiresAt().isBefore(LocalDateTime.now(ZoneId.of("UTC")))) {
+            verificationRepo.markUsedById(latest.getId());
+            throw new IllegalArgumentException("El código ha expirado");
+        }
+
+        if (!latest.getCode().equals(code)) {
+            latest.setAttempts(latest.getAttempts() + 1);
+            verificationRepo.save(latest);
             throw new IllegalArgumentException("Código incorrecto");
         }
 
-        v.setUsed(true);
-        verificationRepo.save(v);
+        int updated = verificationRepo.markUsedById(latest.getId());
+        if (updated != 1) {
+            throw new IllegalStateException("No se pudo confirmar el código, intenta de nuevo");
+        }
     }
 
-    /**
-     * Paso 3: commit del cambio. Requiere que exista un código USADO para el NUEVO email.
-     */
     @Transactional
     public void commitEmailChange(Integer idUsuario, String newEmailRaw) {
         String newEmail = normalizeEmail(newEmailRaw);
@@ -196,11 +222,9 @@ public class SignupService {
         Usuario user = usuarioRepository.findById(idUsuario)
                 .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
 
-        // Verificar que el último código para el nuevo email fue usado (validado)
         verificationRepo.findTopByEmailAndUsedOrderByIdDesc(newEmail, true)
                 .orElseThrow(() -> new IllegalArgumentException("Debes validar el código enviado al nuevo correo"));
 
-        // Último check por condición de carrera
         if (usuarioRepository.existsByEmail(newEmail)) {
             throw new IllegalArgumentException("El email ya está en uso por otra cuenta");
         }
@@ -208,10 +232,29 @@ public class SignupService {
         user.setEmail(newEmail);
         usuarioRepository.save(user);
 
-        // Invalidar cualquier código pendiente asociado al nuevo email
-        verificationRepo.markAllUnusedAsUsedForEmail(newEmail);
+        invalidateOldAsync(newEmail, null);
 
-        // Aviso opcional
         emailService.sendEmailChangeSuccess(newEmail);
+    }
+
+    /* ===================== Utilidades ===================== */
+
+    private void invalidateOldAsync(String email, Integer keepId) {
+        // Transacción separada, corta, para no bloquear el flujo de /start o /complete
+        TransactionTemplate tt = new TransactionTemplate(txManager);
+        tt.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
+        tt.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        tt.setTimeout(5);
+        try {
+            tt.executeWithoutResult(s -> {
+                if (keepId == null) {
+                    verificationRepo.markAllUnusedAsUsedForEmail(email);
+                } else {
+                    verificationRepo.invalidateOthers(email, keepId);
+                }
+            });
+        } catch (Exception ignored) {
+            // No romper el flujo principal por la limpieza
+        }
     }
 }

@@ -2,9 +2,15 @@ package com.fisio.fisio.model;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Entity
-@Table(name = "verification_code")
+@Table(
+        name = "verification_code",
+        indexes = {
+                @Index(name = "idx_verif_email_used_created", columnList = "email,used,created_at")
+        }
+)
 public class VerificationCode {
 
     @Id
@@ -26,12 +32,16 @@ public class VerificationCode {
     @Column(nullable = false)
     private int attempts = 0;
 
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt = LocalDateTime.now(ZoneId.of("UTC"));
+
     public VerificationCode() {}
 
     public VerificationCode(String email, String code, LocalDateTime expiresAt) {
         this.email = email;
         this.code = code;
         this.expiresAt = expiresAt;
+        this.createdAt = LocalDateTime.now(ZoneId.of("UTC"));
     }
 
     // Getters/Setters
@@ -52,4 +62,7 @@ public class VerificationCode {
 
     public int getAttempts() { return attempts; }
     public void setAttempts(int attempts) { this.attempts = attempts; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 }
