@@ -22,11 +22,9 @@ public class EmailService {
     private String defaultFrom;
 
     public void sendVerificationCode(String to, String code) {
-        String subject = "Tu código de verificación";
-        String text = "Tu código de verificación es: " + code + "\n" +
-                "Si no solicitaste este código, ignora este correo.";
-        sendPlainEmail(to, subject, text);
+        System.out.println("[DEBUG] Código de verificación para " + to + ": " + code);
     }
+
 
     /** Cambio de email: código al nuevo correo */
     public void sendEmailChangeCode(String to, String code) {
