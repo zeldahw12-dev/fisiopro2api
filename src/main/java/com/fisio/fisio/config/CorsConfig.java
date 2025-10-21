@@ -22,6 +22,8 @@ public class CorsConfig {
 
     @Value("${app.cors.allowed-origins:*}")
     private String allowedOriginsProp;
+    @Value("${app.security.permit-all:true}")
+    private boolean permitAll;
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
