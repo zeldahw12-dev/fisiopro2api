@@ -1,17 +1,16 @@
-# Usamos la imagen oficial de Java 17
-FROM eclipse-temurin:17-jdk
-
-# Establecer directorio de trabajo
+# Imagen base con Java 17 y Maven
+FROM maven:3.9.6-eclipse-temurin-17 AS build
 WORKDIR /app
 
-# Copiar los archivos de Maven y el proyecto
-COPY . .
+# Copiar archivos y compilar
+COPY pom.xml .
+COPY src ./src
+RUN mvn clean package -DskipTests
 
-# Compilar el proyecto
-RUN ./mvnw -B -DskipTests clean package
+# Etapa final con solo el artefacto
+FROM eclipse-temurin:17-jdk
+WORKDIR /app
+COPY --from=build /app/target/fisio-0.0.1-SNAPSHOT.war app.war
 
-# Exponer el puerto
 EXPOSE 8080
-
-# Comando para ejecutar la aplicación
-CMD ["java", "-jar", "target/fisio-0.0.1-SNAPSHOT.war"]
+ENTRYPOINT ["java", "-jar", "app.war"]
