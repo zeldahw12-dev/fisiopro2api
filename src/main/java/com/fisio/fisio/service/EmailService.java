@@ -26,6 +26,7 @@ public class EmailService {
     }
 
 
+
     /** Cambio de email: código al nuevo correo */
     public void sendEmailChangeCode(String to, String code) {
         String subject = "Confirma tu nuevo correo en FisioApp";
