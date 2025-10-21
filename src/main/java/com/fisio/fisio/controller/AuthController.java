@@ -36,6 +36,26 @@ public class AuthController {
         this.usuarioRepository = usuarioRepository;
         this.emailService = emailService;
     }
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody Map<String, String> req) {
+        String email = normalizeEmail(req.get("email"));
+        String password = req.get("password");
+
+        Usuario usuario = usuarioRepository.findByEmail(email)
+                .filter(u -> u.getContra().equals(password))
+                .orElse(null);
+
+        if (usuario == null) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("message", "Credenciales inválidas"));
+        }
+
+        // Aquí podrías generar un token JWT, pero por ahora devolvemos datos simples:
+        return ResponseEntity.ok(Map.of(
+                "token", "fake-jwt-token",
+                "user", usuario
+        ));
+    }
 
     private String normalizeEmail(String raw) {
         return raw == null ? null : raw.trim().toLowerCase(Locale.ROOT);
