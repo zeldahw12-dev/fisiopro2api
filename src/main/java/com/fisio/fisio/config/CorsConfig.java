@@ -12,10 +12,10 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * CORS centralizado. Controla orígenes por propiedad:
+ * 🌍 CORS centralizado. Controla orígenes por propiedad:
  *   app.cors.allowed-origins=https://tu-dominio.com,exp://192.168.0.10:19000,http://localhost:8081
  *
- * Si se deja vacío o "*", permite todo (útil en desarrollo).
+ * Si se deja vacío o "*", permite todo (útil en desarrollo o Render).
  */
 @Configuration
 public class CorsConfig {
@@ -27,11 +27,10 @@ public class CorsConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration cfg = new CorsConfiguration();
 
-        List<String> origins;
         if (!StringUtils.hasText(allowedOriginsProp) || "*".equals(allowedOriginsProp.trim())) {
-            cfg.addAllowedOriginPattern("*"); // comodín para dev
+            cfg.addAllowedOriginPattern("*");
         } else {
-            origins = Arrays.stream(allowedOriginsProp.split(","))
+            List<String> origins = Arrays.stream(allowedOriginsProp.split(","))
                     .map(String::trim)
                     .filter(StringUtils::hasText)
                     .toList();
@@ -40,7 +39,7 @@ public class CorsConfig {
 
         cfg.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         cfg.addAllowedHeader("*");
-        cfg.setAllowCredentials(false); // ponlo en true solo si necesitas cookies
+        cfg.setAllowCredentials(false);
         cfg.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

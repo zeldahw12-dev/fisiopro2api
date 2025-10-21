@@ -68,36 +68,31 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        // Configuración general
+        System.out.println("[SecurityConfig] permitAll=" + permitAll);
+
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
         if (permitAll) {
-            // 🔓 Modo libre (Render / desarrollo)
-            http.authorizeHttpRequests(reg -> reg
-                    .anyRequest().permitAll()
-            );
+            System.out.println("[SecurityConfig] All routes are open ✅");
+            http.authorizeHttpRequests(reg -> reg.anyRequest().permitAll());
         } else {
-            // 🔐 Modo seguro (producción real)
+            System.out.println("[SecurityConfig] JWT mode enabled 🔐");
             http.authorizeHttpRequests(reg -> reg
                     .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                     .anyRequest().authenticated()
             );
-            // Agrega validación JWT
-            http.addFilterBefore(new JwtAuthFilter(jwtSecret, jwtIssuer), UsernamePasswordAuthenticationFilter.class);
+            http.addFilterBefore(new JwtAuthFilter(jwtSecret, jwtIssuer),
+                    UsernamePasswordAuthenticationFilter.class);
         }
 
-        // Evitar problemas con iframes / H2-console, etc.
         http.headers(headers -> headers.frameOptions(frame -> frame.disable()));
-
         return http.build();
     }
 
-    /**
-     * 🧩 Filtro JWT: valida el Bearer token y autentica al usuario
-     */
+    /** 🧩 Filtro JWT: valida el Bearer token y autentica al usuario */
     static class JwtAuthFilter extends org.springframework.web.filter.OncePerRequestFilter {
         private final SecretKey key;
         private final String issuer;
@@ -114,8 +109,6 @@ public class SecurityConfig {
                 throws ServletException, IOException {
 
             String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
-
-            // Si no hay token, continuar sin autenticación
             if (!StringUtils.hasText(authHeader) || !authHeader.startsWith("Bearer ")) {
                 filterChain.doFilter(request, response);
                 return;
@@ -134,7 +127,7 @@ public class SecurityConfig {
                     throw new RuntimeException("Invalid issuer");
                 }
 
-                String subject = claims.getSubject(); // normalmente email o id
+                String subject = claims.getSubject();
                 if (!StringUtils.hasText(subject)) {
                     throw new RuntimeException("Missing subject");
                 }
@@ -147,12 +140,10 @@ public class SecurityConfig {
                 );
                 authentication.setDetails(request);
 
-                // Establecer en el contexto
                 org.springframework.security.core.context.SecurityContextHolder
                         .getContext().setAuthentication(authentication);
 
             } catch (Exception ex) {
-                // Token inválido o expirado → sin autenticación
                 org.springframework.security.core.context.SecurityContextHolder.clearContext();
             }
 
