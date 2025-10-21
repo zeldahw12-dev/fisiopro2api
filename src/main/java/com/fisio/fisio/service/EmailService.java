@@ -13,7 +13,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class EmailService {
 
-    private static final boolean LOG_ONLY = false; // true = solo log; false = envía
+    private static final boolean LOG_ONLY = true; // ✅ Evita error en Render
+
 
     @Autowired(required = false)
     private JavaMailSender mailSender;
