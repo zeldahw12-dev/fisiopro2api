@@ -78,24 +78,5 @@ public class AuthController {
 
     /* ===================== CAMBIO DE EMAIL NUEVO ===================== */
 
-    /** Paso 1: iniciar cambio, manda código al NUEVO email */
-    @PostMapping("/email-change/start")
-    public ResponseEntity<?> startEmailChange(@Valid @RequestBody EmailChangeStartRequest req) {
-        signupService.startEmailChange(req.getIdUsuario(), req.getNewEmail());
-        return ResponseEntity.ok(Map.of("message", "Código enviado al nuevo correo"));
-    }
 
-    /** Paso 2: verificar código contra el NUEVO email */
-    @PostMapping("/email-change/verify")
-    public ResponseEntity<?> verifyEmailChange(@Valid @RequestBody EmailChangeVerifyRequest req) {
-        signupService.verifyEmailChange(req.getNewEmail(), req.getCode());
-        return ResponseEntity.ok(Map.of("verified", true));
-    }
-
-    /** Paso 3: commit del cambio de correo */
-    @PostMapping("/email-change/commit")
-    public ResponseEntity<?> commitEmailChange(@Valid @RequestBody EmailChangeCommitRequest req) {
-        signupService.commitEmailChange(req.getIdUsuario(), req.getNewEmail());
-        return ResponseEntity.ok(Map.of("message", "Correo actualizado correctamente"));
-    }
 }
