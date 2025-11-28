@@ -121,7 +121,6 @@ public class CartaDerivacionService {
         d.setContactoRemitente(e.getContactoRemitente());
         d.setContactoPaciente(e.getContactoPaciente());
 
-        d.setAdjuntosLinks(e.getAdjuntosLinks() != null ? e.getAdjuntosLinks() : new ArrayList<>());
 
         d.setObservaciones(e.getObservaciones());
 
@@ -161,7 +160,6 @@ public class CartaDerivacionService {
         e.setContactoRemitente(d.getContactoRemitente());
         e.setContactoPaciente(d.getContactoPaciente());
 
-        e.setAdjuntosLinks(d.getAdjuntosLinks() != null ? d.getAdjuntosLinks() : new ArrayList<>());
         e.setObservaciones(d.getObservaciones());
     }
 
