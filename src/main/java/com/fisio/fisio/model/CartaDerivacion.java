@@ -5,8 +5,6 @@ import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
 
 @Entity
 @Table(name = "cartas_derivacion")
@@ -75,14 +73,6 @@ public class CartaDerivacion {
     private String contactoRemitente;
     private String contactoPaciente;
 
-    @ElementCollection
-    @CollectionTable(
-            name = "carta_derivacion_adjuntos",
-            joinColumns = @JoinColumn(name = "id_carta")
-    )
-    @Column(name = "url", length = 1000)
-    private List<String> adjuntosLinks = new ArrayList<>();
-
     @Column(columnDefinition = "TEXT")
     private String observaciones;
 
@@ -133,7 +123,7 @@ public class CartaDerivacion {
     public void setPruebasRealizadas(String pruebasRealizadas) { this.pruebasRealizadas = pruebasRealizadas; }
 
     public String getTratamientosIntentados() { return tratamientosIntentados; }
-    public void setTratamientosIntentados(String tratamientosIntentados) { this.tratamientosIntentados = tratamientosIntentados; }
+    public void setTratamientosIntentados(String tratamientosIntentidos) { this.tratamientosIntentados = tratamientosIntentidos; }
 
     public String getRespuestaTratamiento() { return respuestaTratamiento; }
     public void setRespuestaTratamiento(String respuestaTratamiento) { this.respuestaTratamiento = respuestaTratamiento; }
@@ -161,11 +151,6 @@ public class CartaDerivacion {
 
     public String getContactoPaciente() { return contactoPaciente; }
     public void setContactoPaciente(String contactoPaciente) { this.contactoPaciente = contactoPaciente; }
-
-    public List<String> getAdjuntosLinks() { return adjuntosLinks; }
-    public void setAdjuntosLinks(List<String> adjuntosLinks) {
-        this.adjuntosLinks = (adjuntosLinks != null ? adjuntosLinks : new ArrayList<>());
-    }
 
     public String getObservaciones() { return observaciones; }
     public void setObservaciones(String observaciones) { this.observaciones = observaciones; }
