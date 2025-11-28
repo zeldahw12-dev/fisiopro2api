@@ -1,6 +1,7 @@
 package com.fisio.fisio.dto.signup;
 
 import jakarta.validation.constraints.*;
+import java.time.LocalDate;
 
 public class CompleteSignupRequest {
 
@@ -13,8 +14,14 @@ public class CompleteSignupRequest {
     @NotBlank @Size(max = 100)
     private String nombre;
 
-    @NotNull @Min(1) @Max(120)
-    private Integer edad;
+    // ❌ ANTES:
+    // @NotNull @Min(1) @Max(120)
+    // private Integer edad;
+
+    // ✅ AHORA:
+    @NotNull
+    @Past(message = "La fecha de nacimiento debe ser en el pasado")
+    private LocalDate fechaNacimiento;
 
     @NotBlank @Size(min = 6, max = 100)
     private String contra;
@@ -40,8 +47,13 @@ public class CompleteSignupRequest {
     public String getNombre() { return nombre; }
     public void setNombre(String nombre) { this.nombre = nombre; }
 
-    public Integer getEdad() { return edad; }
-    public void setEdad(Integer edad) { this.edad = edad; }
+    // ❌ ANTES:
+    // public Integer getEdad() { return edad; }
+    // public void setEdad(Integer edad) { this.edad = edad; }
+
+    // ✅ AHORA:
+    public LocalDate getFechaNacimiento() { return fechaNacimiento; }
+    public void setFechaNacimiento(LocalDate fechaNacimiento) { this.fechaNacimiento = fechaNacimiento; }
 
     public String getContra() { return contra; }
     public void setContra(String contra) { this.contra = contra; }

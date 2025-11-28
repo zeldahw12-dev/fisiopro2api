@@ -59,7 +59,6 @@ public class SignupService {
             throw new IllegalArgumentException("El email ya está registrado");
         }
 
-        // insertar nuevo código
         String code = generateCode();
         VerificationCode v = new VerificationCode(
                 email,
@@ -70,7 +69,6 @@ public class SignupService {
         v.setAttempts(0);
         verificationRepo.save(v);
 
-        // invalidar otros en background
         CompletableFuture.runAsync(() -> invalidateOldAsync(email, v.getId()));
 
         emailService.sendVerificationCode(email, code);
@@ -126,7 +124,9 @@ public class SignupService {
         Usuario u = new Usuario();
         u.setNickname(req.getNickname().trim());
         u.setNombre(req.getNombre().trim());
-        u.setEdad(req.getEdad());
+        // ❌ ANTES: u.setFechaNacimiento(req.getFe());
+        // ✅ AHORA: usamos el getter correcto del DTO de signup
+        u.setFechaNacimiento(req.getFechaNacimiento());
         u.setEmail(email);
         u.setContra(req.getContra()); // hash pendiente
         u.setFoto(req.getFoto());
@@ -141,7 +141,9 @@ public class SignupService {
         dto.setIdUsuario(saved.getIdUsuario());
         dto.setNickname(saved.getNickname());
         dto.setNombre(saved.getNombre());
-        dto.setEdad(saved.getEdad());
+        // ❌ ANTES: dto.setEdad(saved.getEdad());
+        // ✅ AHORA:
+        dto.setFechaNacimiento(saved.getFechaNacimiento());
         dto.setEmail(saved.getEmail());
         dto.setContra(saved.getContra());
         dto.setFoto(saved.getFoto());
