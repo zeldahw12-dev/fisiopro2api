@@ -2,6 +2,7 @@ package com.fisio.fisio.dto;
 
 import com.fisio.fisio.model.enums.EstadoCivil;
 import com.fisio.fisio.model.enums.Sexo;
+import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -15,8 +16,11 @@ public class HistoriaClinicaDTO {
     // INFORMACIÓN BÁSICA DEL PACIENTE
     private LocalDate fecha;
     private String nombre;
-    private Integer edad;
+
+    @NotNull(message = "La fecha de nacimiento es obligatoria")
+    @Past(message = "La fecha de nacimiento debe ser en el pasado")
     private LocalDate fechaNacimiento;
+
     private Sexo sexo;
     private String ocupacion;
     private String escolaridad;
@@ -92,11 +96,10 @@ public class HistoriaClinicaDTO {
     // Constructores
     public HistoriaClinicaDTO() {}
 
-    public HistoriaClinicaDTO(Integer idPaciente, String nombre, Integer edad,
+    public HistoriaClinicaDTO(Integer idPaciente, String nombre,
                               LocalDate fechaNacimiento, LocalDate fecha, Sexo sexo) {
         this.idPaciente = idPaciente;
         this.nombre = nombre;
-        this.edad = edad;
         this.fechaNacimiento = fechaNacimiento;
         this.fecha = fecha;
         this.sexo = sexo;
@@ -115,9 +118,6 @@ public class HistoriaClinicaDTO {
 
     public String getNombre() { return nombre; }
     public void setNombre(String nombre) { this.nombre = nombre; }
-
-    public Integer getEdad() { return edad; }
-    public void setEdad(Integer edad) { this.edad = edad; }
 
     public LocalDate getFechaNacimiento() { return fechaNacimiento; }
     public void setFechaNacimiento(LocalDate fechaNacimiento) { this.fechaNacimiento = fechaNacimiento; }

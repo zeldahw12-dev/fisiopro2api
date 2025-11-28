@@ -16,7 +16,6 @@ import java.util.List;
 @RequestMapping("/altas")
 @CrossOrigin(origins = "*")
 public class AltaController {
-
     @Autowired
     private AltaService altaService;
 

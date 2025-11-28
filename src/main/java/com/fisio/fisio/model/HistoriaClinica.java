@@ -54,9 +54,6 @@ public class HistoriaClinica {
     @Column(name = "nombre", length = 120)
     private String nombre;
 
-    @Column(name = "edad")
-    private Integer edad;
-
     @Column(name = "fecha_nacimiento")
     private LocalDate fechaNacimiento;
 
@@ -237,8 +234,6 @@ public class HistoriaClinica {
     public void setHora(LocalTime hora) { this.hora = hora; }
     public String getNombre() { return nombre; }
     public void setNombre(String nombre) { this.nombre = nombre; }
-    public Integer getEdad() { return edad; }
-    public void setEdad(Integer edad) { this.edad = edad; }
     public LocalDate getFechaNacimiento() { return fechaNacimiento; }
     public void setFechaNacimiento(LocalDate fechaNacimiento) { this.fechaNacimiento = fechaNacimiento; }
     public Sexo getSexo() { return sexo; }

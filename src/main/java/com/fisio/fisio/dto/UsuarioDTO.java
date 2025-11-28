@@ -4,6 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+
 /**
  * DTO de salida (lectura). Incluye 'contra' para no romper tu app actual.
  * Idealmente NO debería exponerse la contraseña, pero lo mantenemos por compatibilidad.
@@ -19,7 +21,8 @@ public class UsuarioDTO {
 
     private String nombre;
 
-    private Integer edad;
+    // <CHANGE> Replaced edad with fechaNacimiento
+    private LocalDate fechaNacimiento;
 
     private String email;
 
@@ -36,8 +39,11 @@ public class UsuarioDTO {
     public void setNickname(String nickname) { this.nickname = nickname; }
     public String getNombre() { return nombre; }
     public void setNombre(String nombre) { this.nombre = nombre; }
-    public Integer getEdad() { return edad; }
-    public void setEdad(Integer edad) { this.edad = edad; }
+
+    // <CHANGE> Replaced getEdad/setEdad with fechaNacimiento methods
+    public LocalDate getFechaNacimiento() { return fechaNacimiento; }
+    public void setFechaNacimiento(LocalDate fechaNacimiento) { this.fechaNacimiento = fechaNacimiento; }
+
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
     public String getContra() { return contra; }

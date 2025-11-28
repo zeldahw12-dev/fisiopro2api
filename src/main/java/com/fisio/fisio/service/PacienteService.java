@@ -43,7 +43,8 @@ public class PacienteService {
         return pacienteRepository.findById(id)
                 .map(existingPaciente -> {
                     existingPaciente.setNombre(pacienteDTO.getNombre());
-                    existingPaciente.setEdad(pacienteDTO.getEdad());
+                    // <CHANGE> Replaced setEdad with setFechaNacimiento
+                    existingPaciente.setFechaNacimiento(pacienteDTO.getFechaNacimiento());
                     existingPaciente.setDiagnosticoMedico(pacienteDTO.getDiagnosticoMedico());
 
                     Usuario usuario = usuarioRepository.findById(pacienteDTO.getUsuarioId())
@@ -73,7 +74,8 @@ public class PacienteService {
         PacienteDTO dto = new PacienteDTO();
         dto.setIdPaciente(paciente.getIdPaciente());
         dto.setNombre(paciente.getNombre());
-        dto.setEdad(paciente.getEdad());
+        // <CHANGE> Replaced setEdad with setFechaNacimiento
+        dto.setFechaNacimiento(paciente.getFechaNacimiento());
         dto.setDiagnosticoMedico(paciente.getDiagnosticoMedico());
         dto.setUsuarioId(paciente.getUsuario().getIdUsuario());
         return dto;
@@ -83,7 +85,8 @@ public class PacienteService {
         Paciente paciente = new Paciente();
         paciente.setIdPaciente(pacienteDTO.getIdPaciente());
         paciente.setNombre(pacienteDTO.getNombre());
-        paciente.setEdad(pacienteDTO.getEdad());
+        // <CHANGE> Replaced setEdad with setFechaNacimiento
+        paciente.setFechaNacimiento(pacienteDTO.getFechaNacimiento());
         paciente.setDiagnosticoMedico(pacienteDTO.getDiagnosticoMedico());
 
         Usuario usuario = usuarioRepository.findById(pacienteDTO.getUsuarioId())

@@ -161,7 +161,6 @@ public class HistoriaClinicaService {
         // Información básica
         historia.setFecha(dto.getFecha());
         historia.setNombre(dto.getNombre());
-        historia.setEdad(dto.getEdad());
         historia.setFechaNacimiento(dto.getFechaNacimiento());
         historia.setSexo(dto.getSexo());
         historia.setOcupacion(dto.getOcupacion());
@@ -241,7 +240,6 @@ public class HistoriaClinicaService {
         // Información básica
         dto.setFecha(historia.getFecha());
         dto.setNombre(historia.getNombre());
-        dto.setEdad(historia.getEdad());
         dto.setFechaNacimiento(historia.getFechaNacimiento());
         dto.setSexo(historia.getSexo());
         dto.setOcupacion(historia.getOcupacion());
@@ -324,7 +322,6 @@ public class HistoriaClinicaService {
         // Información básica
         historia.setFecha(dto.getFecha());
         historia.setNombre(dto.getNombre());
-        historia.setEdad(dto.getEdad());
         historia.setFechaNacimiento(dto.getFechaNacimiento());
         historia.setSexo(dto.getSexo());
         historia.setOcupacion(dto.getOcupacion());

@@ -12,7 +12,6 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AltaDTO {
-
     private Integer idAlta;
 
     @Size(max = 50, message = "El número de expediente no puede exceder 50 caracteres")
@@ -22,11 +21,8 @@ public class AltaDTO {
     @Size(max = 100, message = "El nombre del paciente no puede exceder 100 caracteres")
     private String nombrePaciente;
 
-    @NotNull(message = "La edad es obligatoria")
-    @Min(value = 1, message = "La edad debe ser mayor a 0")
-    @Max(value = 120, message = "La edad debe ser menor a 120")
-    private Integer edad;
-
+    @NotNull(message = "La fecha de nacimiento es obligatoria")
+    @Past(message = "La fecha de nacimiento debe ser en el pasado")
     private LocalDate fechaNacimiento;
 
     private Sexo sexo;
@@ -61,9 +57,6 @@ public class AltaDTO {
 
     public String getNombrePaciente() { return nombrePaciente; }
     public void setNombrePaciente(String nombrePaciente) { this.nombrePaciente = nombrePaciente; }
-
-    public Integer getEdad() { return edad; }
-    public void setEdad(Integer edad) { this.edad = edad; }
 
     public LocalDate getFechaNacimiento() { return fechaNacimiento; }
     public void setFechaNacimiento(LocalDate fechaNacimiento) { this.fechaNacimiento = fechaNacimiento; }

@@ -17,7 +17,6 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Alta {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id_alta")
@@ -28,19 +27,13 @@ public class Alta {
     @OnDelete(action = OnDeleteAction.CASCADE)
     private Paciente paciente;
 
-    // Campos requeridos por AltaService (según tus errores)
     @Column(name = "numero_expediente", length = 100)
     private String numeroExpediente;
 
     @Column(name = "nombre_paciente", length = 120)
     private String nombrePaciente;
 
-    @Column(name = "edad")
-    private Integer edad;
-
-    @Column(name = "fecha_}" +
-            "" +
-            "nacimiento")
+    @Column(name = "fecha_nacimiento")
     private LocalDate fechaNacimiento;
 
     @Enumerated(EnumType.STRING)
@@ -77,34 +70,46 @@ public class Alta {
     // Getters/Setters explícitos para compatibilidad con AltaService
     public Integer getIdAlta() { return idAlta; }
     public void setIdAlta(Integer idAlta) { this.idAlta = idAlta; }
+
     public Paciente getPaciente() { return paciente; }
     public void setPaciente(Paciente paciente) { this.paciente = paciente; }
+
     public String getNumeroExpediente() { return numeroExpediente; }
     public void setNumeroExpediente(String numeroExpediente) { this.numeroExpediente = numeroExpediente; }
+
     public String getNombrePaciente() { return nombrePaciente; }
     public void setNombrePaciente(String nombrePaciente) { this.nombrePaciente = nombrePaciente; }
-    public Integer getEdad() { return edad; }
-    public void setEdad(Integer edad) { this.edad = edad; }
+
     public LocalDate getFechaNacimiento() { return fechaNacimiento; }
     public void setFechaNacimiento(LocalDate fechaNacimiento) { this.fechaNacimiento = fechaNacimiento; }
+
     public Sexo getSexo() { return sexo; }
     public void setSexo(Sexo sexo) { this.sexo = sexo; }
+
     public String getDiagnosticoFinal() { return diagnosticoFinal; }
     public void setDiagnosticoFinal(String diagnosticoFinal) { this.diagnosticoFinal = diagnosticoFinal; }
+
     public LocalDate getFechaIngreso() { return fechaIngreso; }
     public void setFechaIngreso(LocalDate fechaIngreso) { this.fechaIngreso = fechaIngreso; }
+
     public LocalDate getFechaAlta() { return fechaAlta; }
     public void setFechaAlta(LocalDate fechaAlta) { this.fechaAlta = fechaAlta; }
+
     public String getSecuelas() { return secuelas; }
     public void setSecuelas(String secuelas) { this.secuelas = secuelas; }
+
     public String getMotivoAlta() { return motivoAlta; }
     public void setMotivoAlta(String motivoAlta) { this.motivoAlta = motivoAlta; }
+
     public String getServiciosOtorgados() { return serviciosOtorgados; }
     public void setServiciosOtorgados(String serviciosOtorgados) { this.serviciosOtorgados = serviciosOtorgados; }
+
     public String getNombreTerapeuta() { return nombreTerapeuta; }
     public void setNombreTerapeuta(String nombreTerapeuta) { this.nombreTerapeuta = nombreTerapeuta; }
+
     public String getObservaciones() { return observaciones; }
     public void setObservaciones(String observaciones) { this.observaciones = observaciones; }
+
     public LocalDateTime getFechaCreacion() { return fechaCreacion; }
     public void setFechaCreacion(LocalDateTime fechaCreacion) { this.fechaCreacion = fechaCreacion; }
 }

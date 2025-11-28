@@ -5,6 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -16,10 +18,10 @@ public class PacienteDTO {
     @Size(max = 100, message = "El nombre no puede exceder 100 caracteres")
     private String nombre;
 
-    @NotNull(message = "La edad es obligatoria")
-    @Min(value = 1, message = "La edad debe ser mayor a 0")
-    @Max(value = 120, message = "La edad debe ser menor a 120")
-    private Integer edad;
+    // <CHANGE> Replaced edad with fechaNacimiento
+    @NotNull(message = "La fecha de nacimiento es obligatoria")
+    @Past(message = "La fecha de nacimiento debe ser en el pasado")
+    private LocalDate fechaNacimiento;
 
     @Size(max = 255, message = "El diagnóstico médico no puede exceder 255 caracteres")
     private String diagnosticoMedico;
@@ -34,8 +36,9 @@ public class PacienteDTO {
     public String getNombre() { return nombre; }
     public void setNombre(String nombre) { this.nombre = nombre; }
 
-    public Integer getEdad() { return edad; }
-    public void setEdad(Integer edad) { this.edad = edad; }
+    // <CHANGE> Replaced getEdad/setEdad with fechaNacimiento methods
+    public LocalDate getFechaNacimiento() { return fechaNacimiento; }
+    public void setFechaNacimiento(LocalDate fechaNacimiento) { this.fechaNacimiento = fechaNacimiento; }
 
     public String getDiagnosticoMedico() { return diagnosticoMedico; }
     public void setDiagnosticoMedico(String diagnosticoMedico) { this.diagnosticoMedico = diagnosticoMedico; }

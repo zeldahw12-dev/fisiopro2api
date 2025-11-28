@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Entity
@@ -22,8 +23,9 @@ public class Paciente {
     @Column(name = "nombre", nullable = false, length = 100)
     private String nombre;
 
-    @Column(name = "edad", nullable = false)
-    private Integer edad;
+    // <CHANGE> Replaced edad with fechaNacimiento
+    @Column(name = "fecha_nacimiento")
+    private LocalDate fechaNacimiento;
 
     @Column(name = "diagnostico_medico", length = 255)
     private String diagnosticoMedico;
@@ -45,15 +47,12 @@ public class Paciente {
     @OneToMany(mappedBy = "paciente", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<Alta> altas;
 
-    // NUEVO: enlaza cartas de derivación
     @OneToMany(mappedBy = "paciente", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<CartaDerivacion> cartasDerivacion;
 
-    // NUEVO: enlaza consentimientos
     @OneToMany(mappedBy = "paciente", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<ConsentimientoInformado> consentimientos;
 
-    // NUEVO: enlaza hojas de ejercicios
     @OneToMany(mappedBy = "paciente", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<HojaEjercicios> hojasEjercicios;
 
@@ -61,8 +60,11 @@ public class Paciente {
     public void setIdPaciente(Integer idPaciente) { this.idPaciente = idPaciente; }
     public String getNombre() { return nombre; }
     public void setNombre(String nombre) { this.nombre = nombre; }
-    public Integer getEdad() { return edad; }
-    public void setEdad(Integer edad) { this.edad = edad; }
+
+    // <CHANGE> Replaced getEdad/setEdad with fechaNacimiento methods
+    public LocalDate getFechaNacimiento() { return fechaNacimiento; }
+    public void setFechaNacimiento(LocalDate fechaNacimiento) { this.fechaNacimiento = fechaNacimiento; }
+
     public String getDiagnosticoMedico() { return diagnosticoMedico; }
     public void setDiagnosticoMedico(String diagnosticoMedico) { this.diagnosticoMedico = diagnosticoMedico; }
     public Usuario getUsuario() { return usuario; }
@@ -75,13 +77,10 @@ public class Paciente {
     public void setHistoriasClinicas(List<HistoriaClinica> historiasClinicas) { this.historiasClinicas = historiasClinicas; }
     public List<Alta> getAltas() { return altas; }
     public void setAltas(List<Alta> altas) { this.altas = altas; }
-
     public List<CartaDerivacion> getCartasDerivacion() { return cartasDerivacion; }
     public void setCartasDerivacion(List<CartaDerivacion> cartasDerivacion) { this.cartasDerivacion = cartasDerivacion; }
-
     public List<ConsentimientoInformado> getConsentimientos() { return consentimientos; }
     public void setConsentimientos(List<ConsentimientoInformado> consentimientos) { this.consentimientos = consentimientos; }
-
     public List<HojaEjercicios> getHojasEjercicios() { return hojasEjercicios; }
     public void setHojasEjercicios(List<HojaEjercicios> hojasEjercicios) { this.hojasEjercicios = hojasEjercicios; }
 }

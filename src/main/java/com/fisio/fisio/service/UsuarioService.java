@@ -49,7 +49,8 @@ public class UsuarioService {
         Usuario entity = new Usuario();
         entity.setNickname(dto.getNickname());
         entity.setNombre(dto.getNombre());
-        entity.setEdad(dto.getEdad());
+        // <CHANGE> Replaced setEdad with setFechaNacimiento
+        entity.setFechaNacimiento(dto.getFechaNacimiento());
         entity.setEmail(dto.getEmail());
         entity.setContra(dto.getContra()); // aquí podrías cifrar
         entity.setFoto(dto.getFoto());
@@ -66,7 +67,8 @@ public class UsuarioService {
 
             if (dto.getNickname()  != null) u.setNickname(dto.getNickname());
             if (dto.getNombre()    != null) u.setNombre(dto.getNombre());
-            if (dto.getEdad()      != null) u.setEdad(dto.getEdad());
+            // <CHANGE> Replaced setEdad with setFechaNacimiento
+            if (dto.getFechaNacimiento() != null) u.setFechaNacimiento(dto.getFechaNacimiento());
             if (dto.getEmail()     != null) u.setEmail(dto.getEmail());
             if (dto.getFoto()      != null) u.setFoto(dto.getFoto());
             if (dto.getProfesion() != null) u.setProfesion(dto.getProfesion());
@@ -111,7 +113,8 @@ public class UsuarioService {
         dto.setIdUsuario(usuario.getIdUsuario());
         dto.setNickname(usuario.getNickname());
         dto.setNombre(usuario.getNombre());
-        dto.setEdad(usuario.getEdad());
+        // <CHANGE> Replaced setEdad with setFechaNacimiento
+        dto.setFechaNacimiento(usuario.getFechaNacimiento());
         dto.setEmail(usuario.getEmail());
         dto.setContra(usuario.getContra()); // Compatibilidad con tu app actual
         dto.setFoto(usuario.getFoto());
@@ -286,21 +289,23 @@ public class UsuarioService {
             sesionesPorDia.put(d, c);
         }
 
-        List<Object[]> edadesRaw = em.createQuery("""
-            select p.edad from Paciente p
-            where p.usuario.idUsuario = :id and p.edad is not null
+        // <CHANGE> Updated age range calculation to use fechaNacimiento instead of edad
+        List<Object[]> fechasNacimientoRaw = em.createQuery("""
+            select p.fechaNacimiento from Paciente p
+            where p.usuario.idUsuario = :id and p.fechaNacimiento is not null
         """, Object[].class)
                 .setParameter("id", idUsuario)
                 .getResultList();
 
         long r0_17 = 0, r18_30 = 0, r31_45 = 0, r46_60 = 0, r61 = 0;
-        for (Object[] row : edadesRaw) {
-            Integer e = (Integer) row[0];
-            if (e == null) continue;
-            if (e <= 17) r0_17++;
-            else if (e <= 30) r18_30++;
-            else if (e <= 45) r31_45++;
-            else if (e <= 60) r46_60++;
+        for (Object[] row : fechasNacimientoRaw) {
+            LocalDate fechaNacimiento = (LocalDate) row[0];
+            if (fechaNacimiento == null) continue;
+            int edad = Period.between(fechaNacimiento, today).getYears();
+            if (edad <= 17) r0_17++;
+            else if (edad <= 30) r18_30++;
+            else if (edad <= 45) r31_45++;
+            else if (edad <= 60) r46_60++;
             else r61++;
         }
         Map<String, Long> pacientesPorRangoEdad = new LinkedHashMap<>();

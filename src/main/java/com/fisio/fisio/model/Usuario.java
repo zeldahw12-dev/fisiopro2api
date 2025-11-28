@@ -5,6 +5,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
+
 @Entity
 @Table(name = "usuario")
 @Data
@@ -26,8 +28,9 @@ public class Usuario {
     @Column(name = "email", nullable = false, length = 100, unique = true)
     private String email;
 
-    @Column(name = "edad")
-    private Integer edad;
+    // <CHANGE> Replaced edad with fechaNacimiento
+    @Column(name = "fecha_nacimiento")
+    private LocalDate fechaNacimiento;
 
     @Column(name = "contra", length = 200, nullable = false)
     private String contra;
@@ -43,8 +46,11 @@ public class Usuario {
     public void setIdUsuario(Integer idUsuario) { this.idUsuario = idUsuario; }
     public String getNickname() { return nickname; }
     public void setNickname(String nickname) { this.nickname = nickname; }
-    public Integer getEdad() { return edad; }
-    public void setEdad(Integer edad) { this.edad = edad; }
+
+    // <CHANGE> Replaced getEdad/setEdad with fechaNacimiento methods
+    public LocalDate getFechaNacimiento() { return fechaNacimiento; }
+    public void setFechaNacimiento(LocalDate fechaNacimiento) { this.fechaNacimiento = fechaNacimiento; }
+
     public String getContra() { return contra; }
     public void setContra(String contra) { this.contra = contra; }
     public String getFoto() { return foto; }

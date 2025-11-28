@@ -15,7 +15,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
-@Transactional // Adding transactional annotation for data synchronization
+@Transactional
 public class AltaService {
 
     @Autowired
@@ -23,8 +23,6 @@ public class AltaService {
 
     @Autowired
     private PacienteRepository pacienteRepository;
-
-    @Autowired
 
     public List<AltaDTO> findAll() {
         return altaRepository.findAll().stream()
@@ -42,11 +40,9 @@ public class AltaService {
 
         if (alta.getPaciente() != null) {
             Paciente paciente = alta.getPaciente();
+            // <CHANGE> Removed edad logic, only keeping nombre and diagnostico
             if (alta.getNombrePaciente() == null || alta.getNombrePaciente().isEmpty()) {
                 alta.setNombrePaciente(paciente.getNombre());
-            }
-            if (alta.getEdad() == null) {
-                alta.setEdad(paciente.getEdad());
             }
             if (alta.getDiagnosticoFinal() == null || alta.getDiagnosticoFinal().isEmpty()) {
                 alta.setDiagnosticoFinal(paciente.getDiagnosticoMedico());
@@ -61,12 +57,11 @@ public class AltaService {
         return altaRepository.findById(id)
                 .map(existingAlta -> {
                     String originalNombre = existingAlta.getNombrePaciente();
-                    Integer originalEdad = existingAlta.getEdad();
                     String originalDiagnostico = existingAlta.getDiagnosticoFinal();
 
                     existingAlta.setNumeroExpediente(altaDTO.getNumeroExpediente());
                     existingAlta.setNombrePaciente(altaDTO.getNombrePaciente());
-                    existingAlta.setEdad(altaDTO.getEdad());
+                    // <CHANGE> Removed setEdad, only setting fechaNacimiento
                     existingAlta.setFechaNacimiento(altaDTO.getFechaNacimiento());
                     existingAlta.setSexo(altaDTO.getSexo());
                     existingAlta.setDiagnosticoFinal(altaDTO.getDiagnosticoFinal());
@@ -84,11 +79,9 @@ public class AltaService {
 
                     Alta savedAlta = altaRepository.save(existingAlta);
 
+                    // <CHANGE> Removed edad comparison from sync check
                     boolean needsSync = !originalNombre.equals(altaDTO.getNombrePaciente()) ||
-                            !originalEdad.equals(altaDTO.getEdad()) ||
                             (originalDiagnostico != null && !originalDiagnostico.equals(altaDTO.getDiagnosticoFinal()));
-
-
 
                     return convertToDTO(savedAlta);
                 });
@@ -137,7 +130,7 @@ public class AltaService {
         dto.setIdAlta(alta.getIdAlta());
         dto.setNumeroExpediente(alta.getNumeroExpediente());
         dto.setNombrePaciente(alta.getNombrePaciente());
-        dto.setEdad(alta.getEdad());
+        // <CHANGE> Removed setEdad, only setting fechaNacimiento
         dto.setFechaNacimiento(alta.getFechaNacimiento());
         dto.setSexo(alta.getSexo());
         dto.setDiagnosticoFinal(alta.getDiagnosticoFinal());
@@ -157,7 +150,7 @@ public class AltaService {
         alta.setIdAlta(altaDTO.getIdAlta());
         alta.setNumeroExpediente(altaDTO.getNumeroExpediente());
         alta.setNombrePaciente(altaDTO.getNombrePaciente());
-        alta.setEdad(altaDTO.getEdad());
+        // <CHANGE> Removed setEdad, only setting fechaNacimiento
         alta.setFechaNacimiento(altaDTO.getFechaNacimiento());
         alta.setSexo(altaDTO.getSexo());
         alta.setDiagnosticoFinal(altaDTO.getDiagnosticoFinal());
