@@ -27,6 +27,8 @@
 	</properties>
 
 	<dependencies>
+
+
 		<!-- Web -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -38,6 +40,8 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-mail</artifactId>
 		</dependency>
+
+
 
 		<!-- JPA -->
 		<dependency>
