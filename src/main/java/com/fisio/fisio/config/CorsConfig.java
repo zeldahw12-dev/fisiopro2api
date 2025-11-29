@@ -12,24 +12,27 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * 🌍 CORS centralizado. Controla orígenes por propiedad:
+ * 🌍 CORS centralizado.
+ *
+ * Configuras orígenes permitidos con:
  *   app.cors.allowed-origins=https://tu-dominio.com,exp://192.168.0.10:19000,http://localhost:8081
  *
- * Si se deja vacío o "*", permite todo (útil en desarrollo o Render).
+ * Si se deja vacío o "*", permite todo (útil para desarrollo).
+ * Como sólo usas app móvil (sin cookies), `allowCredentials=false` es correcto.
  */
 @Configuration
 public class CorsConfig {
 
     @Value("${app.cors.allowed-origins:*}")
     private String allowedOriginsProp;
-    @Value("${app.security.permit-all:true}")
-    private boolean permitAll;
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration cfg = new CorsConfiguration();
 
+        // Orígenes permitidos
         if (!StringUtils.hasText(allowedOriginsProp) || "*".equals(allowedOriginsProp.trim())) {
+            // Dev / modo abierto
             cfg.addAllowedOriginPattern("*");
         } else {
             List<String> origins = Arrays.stream(allowedOriginsProp.split(","))
@@ -39,9 +42,15 @@ public class CorsConfig {
             origins.forEach(cfg::addAllowedOrigin);
         }
 
-        cfg.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        // Métodos habituales
+        cfg.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"));
+        // Headers permitidos
         cfg.addAllowedHeader("*");
+
+        // Sin cookies/sesiones → seguro con "*"
         cfg.setAllowCredentials(false);
+
+        // Cache del preflight
         cfg.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

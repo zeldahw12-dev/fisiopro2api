@@ -8,6 +8,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.*;
@@ -19,6 +20,9 @@ public class UsuarioService {
 
     @Autowired
     private UsuarioRepository usuarioRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
 
     @PersistenceContext
     private EntityManager em;
@@ -39,8 +43,13 @@ public class UsuarioService {
         return usuarioRepository.findByEmail(email).map(this::toDTO);
     }
 
-    public boolean existsByEmail(String email) { return usuarioRepository.existsByEmail(email); }
-    public boolean existsByNickname(String nickname) { return usuarioRepository.existsByNickname(nickname); }
+    public boolean existsByEmail(String email) {
+        return usuarioRepository.existsByEmail(email);
+    }
+
+    public boolean existsByNickname(String nickname) {
+        return usuarioRepository.existsByNickname(nickname);
+    }
 
     /* ====== CREATE ====== */
 
@@ -49,10 +58,12 @@ public class UsuarioService {
         Usuario entity = new Usuario();
         entity.setNickname(dto.getNickname());
         entity.setNombre(dto.getNombre());
-        // <CHANGE> Replaced setEdad with setFechaNacimiento
         entity.setFechaNacimiento(dto.getFechaNacimiento());
         entity.setEmail(dto.getEmail());
-        entity.setContra(dto.getContra()); // aquí podrías cifrar
+
+        // ✅ Hasheamos contraseña al crear usuario por este flujo
+        entity.setContra(passwordEncoder.encode(dto.getContra()));
+
         entity.setFoto(dto.getFoto());
         entity.setProfesion(dto.getProfesion());
         Usuario saved = usuarioRepository.save(entity);
@@ -65,17 +76,17 @@ public class UsuarioService {
     public Optional<UsuarioDTO> update(Integer id, UsuarioDTO dto) {
         return usuarioRepository.findById(id).map(u -> {
 
-            if (dto.getNickname()  != null) u.setNickname(dto.getNickname());
-            if (dto.getNombre()    != null) u.setNombre(dto.getNombre());
-            // <CHANGE> Replaced setEdad with setFechaNacimiento
+            if (dto.getNickname() != null) u.setNickname(dto.getNickname());
+            if (dto.getNombre() != null) u.setNombre(dto.getNombre());
             if (dto.getFechaNacimiento() != null) u.setFechaNacimiento(dto.getFechaNacimiento());
-            if (dto.getEmail()     != null) u.setEmail(dto.getEmail());
-            if (dto.getFoto()      != null) u.setFoto(dto.getFoto());
+            if (dto.getEmail() != null) u.setEmail(dto.getEmail());
+            if (dto.getFoto() != null) u.setFoto(dto.getFoto());
             if (dto.getProfesion() != null) u.setProfesion(dto.getProfesion());
 
-            // Contraseña: solo si viene NO nula y no vacía (para no romper compatibilidad)
+            // Contraseña: solo si viene NO nula y no vacía
             if (dto.getContra() != null && !dto.getContra().isBlank()) {
-                u.setContra(dto.getContra()); // ideal: encoder.encode(...)
+                // ✅ Consideramos que lo que llega es la nueva contraseña en claro
+                u.setContra(passwordEncoder.encode(dto.getContra()));
             }
 
             Usuario saved = usuarioRepository.save(u);
@@ -89,7 +100,8 @@ public class UsuarioService {
     public Optional<UsuarioDTO> updatePassword(Integer id, String nuevaContra) {
         return usuarioRepository.findById(id).map(u -> {
             if (nuevaContra == null || nuevaContra.isBlank()) return toDTO(u);
-            u.setContra(nuevaContra); // ideal: encoder.encode(...)
+            // ✅ guardamos hash
+            u.setContra(passwordEncoder.encode(nuevaContra));
             Usuario saved = usuarioRepository.save(u);
             return toDTO(saved);
         });
@@ -113,10 +125,10 @@ public class UsuarioService {
         dto.setIdUsuario(usuario.getIdUsuario());
         dto.setNickname(usuario.getNickname());
         dto.setNombre(usuario.getNombre());
-        // <CHANGE> Replaced setEdad with setFechaNacimiento
         dto.setFechaNacimiento(usuario.getFechaNacimiento());
         dto.setEmail(usuario.getEmail());
-        dto.setContra(usuario.getContra()); // Compatibilidad con tu app actual
+        // Aquí estarás devolviendo el hash; idealmente deberías ocultarlo más adelante
+        dto.setContra(usuario.getContra());
         dto.setFoto(usuario.getFoto());
         dto.setProfesion(usuario.getProfesion());
         return dto;
@@ -289,9 +301,10 @@ public class UsuarioService {
             sesionesPorDia.put(d, c);
         }
 
-        // <CHANGE> Updated age range calculation to use fechaNacimiento instead of edad
+        // Usamos fechaNacimiento para calcular rangos de edad
         List<Object[]> fechasNacimientoRaw = em.createQuery("""
-            select p.fechaNacimiento from Paciente p
+            select p.fechaNacimiento
+            from Paciente p
             where p.usuario.idUsuario = :id and p.fechaNacimiento is not null
         """, Object[].class)
                 .setParameter("id", idUsuario)

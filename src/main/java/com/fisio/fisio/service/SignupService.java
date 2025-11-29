@@ -9,6 +9,7 @@ import com.fisio.fisio.repository.VerificationCodeRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -27,6 +28,7 @@ public class SignupService {
     private final UsuarioRepository usuarioRepository;
     private final EmailService emailService;
     private final PlatformTransactionManager txManager;
+    private final PasswordEncoder passwordEncoder;
 
     @Value("${app.signup.code.expiration-minutes:10}")
     private int expirationMinutes;
@@ -34,11 +36,13 @@ public class SignupService {
     public SignupService(VerificationCodeRepository verificationRepo,
                          UsuarioRepository usuarioRepository,
                          EmailService emailService,
-                         PlatformTransactionManager txManager) {
+                         PlatformTransactionManager txManager,
+                         PasswordEncoder passwordEncoder) {
         this.verificationRepo = verificationRepo;
         this.usuarioRepository = usuarioRepository;
         this.emailService = emailService;
         this.txManager = txManager;
+        this.passwordEncoder = passwordEncoder;
     }
 
     private String normalizeEmail(String raw) {
@@ -124,11 +128,13 @@ public class SignupService {
         Usuario u = new Usuario();
         u.setNickname(req.getNickname().trim());
         u.setNombre(req.getNombre().trim());
-        // ❌ ANTES: u.setFechaNacimiento(req.getFe());
-        // ✅ AHORA: usamos el getter correcto del DTO de signup
         u.setFechaNacimiento(req.getFechaNacimiento());
         u.setEmail(email);
-        u.setContra(req.getContra()); // hash pendiente
+
+        // ✅ Guardamos contraseña hasheada con BCrypt
+        String hashed = passwordEncoder.encode(req.getContra());
+        u.setContra(hashed);
+
         u.setFoto(req.getFoto());
         u.setProfesion(req.getProfesion());
 
@@ -141,10 +147,9 @@ public class SignupService {
         dto.setIdUsuario(saved.getIdUsuario());
         dto.setNickname(saved.getNickname());
         dto.setNombre(saved.getNombre());
-        // ❌ ANTES: dto.setEdad(saved.getEdad());
-        // ✅ AHORA:
         dto.setFechaNacimiento(saved.getFechaNacimiento());
         dto.setEmail(saved.getEmail());
+        // Será el hash, no la contraseña en claro
         dto.setContra(saved.getContra());
         dto.setFoto(saved.getFoto());
         dto.setProfesion(saved.getProfesion());
