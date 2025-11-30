@@ -17,7 +17,7 @@ public interface VerificationCodeRepository extends JpaRepository<VerificationCo
 
     // último código ya usado (para el paso "complete")
     Optional<VerificationCode> findTopByEmailAndUsedOrderByIdDesc(String email, boolean used);
-
+    Optional<VerificationCode> findTopByEmailAndUsedIsFalseOrderByCreatedAtDesc(String email);
     // --- NUEVOS MÉTODOS OPTIMIZADOS ---
     @Query("""
         select v from VerificationCode v

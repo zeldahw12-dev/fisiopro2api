@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * Si no tienes SMTP configurado, pon LOG_ONLY=true para imprimir en consola.
- * NOTA: Enviar contraseñas por correo en texto plano NO es seguro en producción.
+ * Ya no enviamos contraseñas en texto plano, sólo códigos de verificación / recuperación.
  */
 @Service
 public class EmailService {
@@ -32,6 +32,19 @@ public class EmailService {
         sendPlainEmail(to, subject, text);
     }
 
+    /** Recuperar contraseña: código de recuperación */
+    public void sendForgotPasswordCode(String to, String code) {
+        String subject = "Código para recuperar tu contraseña - FisioPro";
+        String text = "Hola,\n\n" +
+                "Has solicitado recuperar tu contraseña en FisioPro.\n\n" +
+                "Tu código de recuperación es:\n\n" +
+                code + "\n\n" +
+                "Este código es válido por unos minutos. Si no solicitaste este código, " +
+                "puedes ignorar este correo.\n\n" +
+                "— FisioPro";
+        sendPlainEmail(to, subject, text);
+    }
+
     /** Cambio de email: código al nuevo correo */
     public void sendEmailChangeCode(String to, String code) {
         String subject = "Confirma tu nuevo correo en FisioPro";
@@ -48,7 +61,7 @@ public class EmailService {
         sendPlainEmail(to, subject, text);
     }
 
-    /** Recuperar contraseña (OJO: inseguro en producción) */
+    /** ⚠️ Ya casi no se usa: enviar contraseña en texto plano (no recomendado) */
     public void sendPasswordReminder(String to, String password) {
         String subject = "Recuperación de contraseña - FisioPro";
         String text = "Hola,\n\n" +

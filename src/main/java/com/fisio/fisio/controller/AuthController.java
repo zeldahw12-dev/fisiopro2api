@@ -5,14 +5,15 @@ import com.fisio.fisio.dto.signup.CompleteSignupRequest;
 import com.fisio.fisio.dto.signup.StartSignupRequest;
 import com.fisio.fisio.dto.signup.VerifyCodeRequest;
 import com.fisio.fisio.dto.auth.ForgotPasswordRequest;
+import com.fisio.fisio.dto.auth.ResetPasswordRequest;
 import com.fisio.fisio.dto.auth.EmailChangeStartRequest;
 import com.fisio.fisio.dto.auth.EmailChangeVerifyRequest;
 import com.fisio.fisio.dto.auth.EmailChangeCommitRequest;
 import com.fisio.fisio.model.Usuario;
 import com.fisio.fisio.repository.UsuarioRepository;
 import com.fisio.fisio.service.EmailChangeService;
-import com.fisio.fisio.service.EmailService;
 import com.fisio.fisio.service.SignupService;
+import com.fisio.fisio.service.PasswordResetService;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import jakarta.validation.Valid;
@@ -35,9 +36,9 @@ public class AuthController {
 
     private final SignupService signupService;
     private final UsuarioRepository usuarioRepository;
-    private final EmailService emailService;
     private final EmailChangeService emailChangeService;
     private final PasswordEncoder passwordEncoder;
+    private final PasswordResetService passwordResetService;
 
     @Value("${app.jwt.secret:dev-secret-please-change-and-set-env}")
     private String jwtSecret;
@@ -50,14 +51,14 @@ public class AuthController {
 
     public AuthController(SignupService signupService,
                           UsuarioRepository usuarioRepository,
-                          EmailService emailService,
                           EmailChangeService emailChangeService,
-                          PasswordEncoder passwordEncoder) {
+                          PasswordEncoder passwordEncoder,
+                          PasswordResetService passwordResetService) {
         this.signupService = signupService;
         this.usuarioRepository = usuarioRepository;
-        this.emailService = emailService;
         this.emailChangeService = emailChangeService;
         this.passwordEncoder = passwordEncoder;
+        this.passwordResetService = passwordResetService;
     }
 
     @PostMapping("/login")
@@ -139,33 +140,31 @@ public class AuthController {
         return ResponseEntity.ok(created);
     }
 
-    /**
-     * Recuperar contraseña:
-     *  Ahora NO se envía la contraseña actual (porque está hasheada).
-     *  En su lugar generamos una contraseña TEMPORAL, la guardamos hasheada y se envía por correo.
-     */
-    @PostMapping("/password/forgot")
-    public ResponseEntity<?> forgotPassword(@Valid @RequestBody ForgotPasswordRequest req) {
-        String email = normalizeEmail(req.getEmail());
+    /* ========== NUEVO FLUJO: OLVIDÉ MI CONTRASEÑA (código + nueva contraseña) ========== */
 
-        return usuarioRepository.findByEmail(email)
-                .<ResponseEntity<?>>map((Usuario u) -> {
-                    // Generamos contraseña temporal simple (podrías hacerla más compleja)
-                    String tempPassword = UUID.randomUUID().toString().replace("-", "").substring(0, 10);
+    /** Paso 1: Usuario pone su email → se envía código al correo */
+    @PostMapping("/password/forgot/start")
+    public ResponseEntity<?> forgotPasswordStart(@Valid @RequestBody ForgotPasswordRequest req) {
+        passwordResetService.startForgotPassword(req);
+        return ResponseEntity.ok(
+                Map.of("message", "Si el correo existe, se envió un código de recuperación.")
+        );
+    }
 
-                    // Guardamos hash de la temporal
-                    u.setContra(passwordEncoder.encode(tempPassword));
-                    usuarioRepository.save(u);
+    /** Paso 2: Usuario ingresa el código → solo validamos que sea correcto */
+    @PostMapping("/password/forgot/verify")
+    public ResponseEntity<?> forgotPasswordVerify(@Valid @RequestBody VerifyCodeRequest req) {
+        passwordResetService.verifyForgotPasswordCode(req);
+        return ResponseEntity.ok(Map.of("verified", true));
+    }
 
-                    // Reutilizamos método de email: ahora le manda la contraseña temporal
-                    emailService.sendPasswordReminder(email, tempPassword);
-
-                    return ResponseEntity.ok(
-                            Map.of("message", "Si el correo existe, se envió una contraseña temporal.")
-                    );
-                })
-                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Map.of("message", "No existe un usuario con ese email.")));
+    /** Paso 3: Usuario escribe nueva contraseña + confirmación → se actualiza */
+    @PostMapping("/password/forgot/reset")
+    public ResponseEntity<?> forgotPasswordReset(@Valid @RequestBody ResetPasswordRequest req) {
+        passwordResetService.resetPassword(req);
+        return ResponseEntity.ok(
+                Map.of("message", "Contraseña actualizada correctamente.")
+        );
     }
 
     /* ===================== CAMBIO DE EMAIL NUEVO ===================== */
