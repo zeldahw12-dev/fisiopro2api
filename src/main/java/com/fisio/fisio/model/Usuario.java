@@ -27,6 +27,17 @@ public class Usuario {
 
     @Column(name = "email", nullable = false, length = 100, unique = true)
     private String email;
+    // ID del cliente en Stripe
+    @Column(name = "stripe_customer_id", length = 100)
+    private String stripeCustomerId;
+
+    // ID de la suscripción activa en Stripe
+    @Column(name = "stripe_subscription_id", length = 100)
+    private String stripeSubscriptionId;
+
+    // Estado de la suscripción (active, canceled, past_due, etc.)
+    @Column(name = "subscription_status", length = 50)
+    private String subscriptionStatus;
 
     @Column(name = "fecha_nacimiento")
     private LocalDate fechaNacimiento;
@@ -67,6 +78,30 @@ public class Usuario {
 
     public String getProfesion() { return profesion; }
     public void setProfesion(String profesion) { this.profesion = profesion; }
+
+    public String getStripeCustomerId() {
+        return stripeCustomerId;
+    }
+
+    public void setStripeCustomerId(String stripeCustomerId) {
+        this.stripeCustomerId = stripeCustomerId;
+    }
+
+    public String getStripeSubscriptionId() {
+        return stripeSubscriptionId;
+    }
+
+    public void setStripeSubscriptionId(String stripeSubscriptionId) {
+        this.stripeSubscriptionId = stripeSubscriptionId;
+    }
+
+    public String getSubscriptionStatus() {
+        return subscriptionStatus;
+    }
+
+    public void setSubscriptionStatus(String subscriptionStatus) {
+        this.subscriptionStatus = subscriptionStatus;
+    }
 
     public String getNombre() { return nombre; }
     public void setNombre(String nombre) { this.nombre = nombre; }
