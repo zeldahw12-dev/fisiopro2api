@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.Customizer;
@@ -74,13 +75,15 @@ public class SecurityConfig {
     @Value("${app.security.rate-limit.refill-per-seconds:60}")
     private long rateLimitRefillSeconds;
 
+    // ⚠️ IMPORTANTE: aquí ya incluimos el webhook de Stripe
     private static final String[] PUBLIC_ENDPOINTS = {
             "/auth/**",
             "/usuarios/email/**",
             "/actuator/health",
             "/v3/api-docs/**",
             "/swagger-ui/**",
-            "/swagger-ui.html"
+            "/swagger-ui.html",
+            "/stripe/webhook"         // <--- webhook accesible sin JWT
     };
 
     @Bean
@@ -115,8 +118,12 @@ public class SecurityConfig {
             );
         } else {
             System.out.println("[SecurityConfig] JWT mode enabled 🔐");
+
             http.authorizeHttpRequests(reg -> reg
+                    // públicos generales
                     .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
+                    // por si acaso queremos ser más explícitos sólo para POST
+                    .requestMatchers(HttpMethod.POST, "/stripe/webhook").permitAll()
                     .anyRequest().authenticated()
             );
 
@@ -272,7 +279,6 @@ public class SecurityConfig {
             }
         }
 
-        /** ⚠️ Aquí ya NO usamos Bucket4j, sino Bucket.builder() */
         private Bucket newBucket(String key) {
             return Bucket.builder()
                     .addLimit(limit -> limit
