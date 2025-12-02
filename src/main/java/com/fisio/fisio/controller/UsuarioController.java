@@ -22,7 +22,26 @@ public class UsuarioController {
     private UsuarioService usuarioService;
 
     /* ====== GET ====== */
+    public static class PlanBody {
+        @NotBlank(message = "El plan no puede estar vacío")
+        public String plan;
+        public String getPlan() { return plan; }
+        public void setPlan(String plan) { this.plan = plan; }
+    }
 
+    // 👉 Nuevo endpoint: cambiar plan (por ejemplo, de FREE a PREMIUM)
+    @PatchMapping("/{id}/plan")
+    public ResponseEntity<?> updatePlan(@PathVariable Integer id,
+                                        @Valid @RequestBody PlanBody body) {
+        try {
+            return usuarioService.updatePlan(id, body.getPlan())
+                    .map(ResponseEntity::ok)
+                    .orElse(ResponseEntity.notFound().build());
+        } catch (IllegalArgumentException ex) {
+            // plan inválido
+            return ResponseEntity.badRequest().body(ex.getMessage());
+        }
+    }
     @GetMapping
     public ResponseEntity<List<UsuarioDTO>> getAllUsuarios() {
         return ResponseEntity.ok(usuarioService.findAll());

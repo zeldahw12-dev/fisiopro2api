@@ -2,6 +2,7 @@ package com.fisio.fisio.service;
 
 import com.fisio.fisio.dto.UsuarioCreateDTO;
 import com.fisio.fisio.dto.UsuarioDTO;
+import com.fisio.fisio.model.PlanTipo;
 import com.fisio.fisio.model.Usuario;
 import com.fisio.fisio.repository.UsuarioRepository;
 import jakarta.persistence.EntityManager;
@@ -61,14 +62,20 @@ public class UsuarioService {
         entity.setFechaNacimiento(dto.getFechaNacimiento());
         entity.setEmail(dto.getEmail());
 
-        // ✅ Hasheamos contraseña al crear usuario por este flujo
+        // ✅ Hasheamos contraseña al crear usuario
         entity.setContra(passwordEncoder.encode(dto.getContra()));
 
         entity.setFoto(dto.getFoto());
         entity.setProfesion(dto.getProfesion());
+
+        // 👉 NUEVO: siempre FREE al crear
+        entity.setPlan(PlanTipo.FREE);
+
+        // tokenVersion por defecto (0) si no lo seteas aquí
         Usuario saved = usuarioRepository.save(entity);
         return toDTO(saved);
     }
+
 
     /* ====== UPDATE PARCIAL (usando UsuarioDTO; no pisa con null) ====== */
 
@@ -127,11 +134,34 @@ public class UsuarioService {
         dto.setNombre(usuario.getNombre());
         dto.setFechaNacimiento(usuario.getFechaNacimiento());
         dto.setEmail(usuario.getEmail());
-        // Aquí estarás devolviendo el hash; idealmente deberías ocultarlo más adelante
         dto.setContra(usuario.getContra());
         dto.setFoto(usuario.getFoto());
         dto.setProfesion(usuario.getProfesion());
+
+        // 👉 NUEVO: mandamos el plan como texto ("FREE" / "PREMIUM")
+        if (usuario.getPlan() != null) {
+            dto.setPlan(usuario.getPlan().name());
+        } else {
+            dto.setPlan("FREE");
+        }
+
         return dto;
+    }
+
+    @Transactional
+    public Optional<UsuarioDTO> updatePlan(Integer id, String nuevoPlan) {
+        return usuarioRepository.findById(id).map(u -> {
+            PlanTipo planTipo;
+            try {
+                planTipo = PlanTipo.valueOf(nuevoPlan.toUpperCase());
+            } catch (IllegalArgumentException ex) {
+                // aquí podrías lanzar una excepción custom para 400 Bad Request
+                throw new IllegalArgumentException("Plan inválido. Usa FREE o PREMIUM.");
+            }
+            u.setPlan(planTipo);
+            Usuario saved = usuarioRepository.save(u);
+            return toDTO(saved);
+        });
     }
 
     /* =============================================================================

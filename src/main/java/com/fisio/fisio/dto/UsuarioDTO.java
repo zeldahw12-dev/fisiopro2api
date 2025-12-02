@@ -24,6 +24,8 @@ public class UsuarioDTO {
     // <CHANGE> Replaced edad with fechaNacimiento
     private LocalDate fechaNacimiento;
 
+    private String plan;
+
     private String email;
 
     private String contra;
@@ -43,7 +45,8 @@ public class UsuarioDTO {
     // <CHANGE> Replaced getEdad/setEdad with fechaNacimiento methods
     public LocalDate getFechaNacimiento() { return fechaNacimiento; }
     public void setFechaNacimiento(LocalDate fechaNacimiento) { this.fechaNacimiento = fechaNacimiento; }
-
+    public String getPlan() { return plan; }
+    public void setPlan(String plan) { this.plan = plan; }
     public String getEmail() { return email; }
     public void setEmail(String email) { this.email = email; }
     public String getContra() { return contra; }
