@@ -1,6 +1,7 @@
 package com.fisio.fisio.service;
 
 import com.fisio.fisio.model.Usuario;
+import com.fisio.fisio.repository.UsuarioRepository;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Customer;
 import com.stripe.model.checkout.Session;
@@ -8,7 +9,6 @@ import com.stripe.param.CustomerCreateParams;
 import com.stripe.param.checkout.SessionCreateParams;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-
 @Service
 public class StripeService {
 
@@ -18,9 +18,16 @@ public class StripeService {
     @Value("${stripe.price.premium.quarterly}")
     private String priceQuarterly;
 
+    private final UsuarioRepository usuarioRepository;
+
+    public StripeService(UsuarioRepository usuarioRepository) {
+        this.usuarioRepository = usuarioRepository;
+    }
+
     // Crea (o reutiliza) el Customer de Stripe
     public String ensureCustomer(Usuario usuario) throws StripeException {
-        if (usuario.getStripeCustomerId() != null) {
+        if (usuario.getStripeCustomerId() != null &&
+                !usuario.getStripeCustomerId().isBlank()) {
             return usuario.getStripeCustomerId();
         }
 
@@ -30,12 +37,17 @@ public class StripeService {
                 .build();
 
         Customer customer = Customer.create(params);
+
+        // ✅ Guardar el customerId en la BD
+        usuario.setStripeCustomerId(customer.getId());
+        usuarioRepository.save(usuario);
+
         return customer.getId();
     }
 
     public Session createSubscriptionCheckoutSession(
             Usuario usuario,
-            String planType,            // "MONTHLY" o "QUARTERLY"
+            String planType,
             String successUrl,
             String cancelUrl
     ) throws StripeException {
