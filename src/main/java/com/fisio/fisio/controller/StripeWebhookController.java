@@ -4,12 +4,11 @@ import com.fisio.fisio.model.PlanTipo;
 import com.fisio.fisio.model.Usuario;
 import com.fisio.fisio.repository.UsuarioRepository;
 import com.stripe.exception.SignatureVerificationException;
-import com.stripe.exception.StripeException;
 import com.stripe.model.Event;
 import com.stripe.model.Subscription;
-import com.stripe.model.checkout.Session;
 import com.stripe.net.Webhook;
 import jakarta.transaction.Transactional;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +17,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/stripe")
+@Slf4j
 public class StripeWebhookController {
 
     @Value("${stripe.webhook-secret}")
@@ -35,119 +35,77 @@ public class StripeWebhookController {
             @RequestHeader("Stripe-Signature") String sigHeader,
             @RequestBody String payload
     ) {
-        System.out.println("[StripeWebhook] payload recibido: " + payload);
+        log.info("[StripeWebhook] llamada recibida");
+
+        if (endpointSecret == null || endpointSecret.isBlank()) {
+            log.error("[StripeWebhook] endpointSecret vacío. Revisa STRIPE_WEBHOOK_SECRET");
+            return ResponseEntity.status(500).body("Webhook secret not configured");
+        }
 
         Event event;
         try {
             event = Webhook.constructEvent(payload, sigHeader, endpointSecret);
         } catch (SignatureVerificationException e) {
-            System.out.println("[StripeWebhook] Firma inválida: " + e.getMessage());
+            log.warn("[StripeWebhook] Firma inválida: {}", e.getMessage());
             return ResponseEntity.status(400).body("Firma inválida");
         }
 
-        String type = event.getType();
-        System.out.println("[StripeWebhook] tipo=" + type);
+        log.info("[StripeWebhook] event.type = {}", event.getType());
 
-        try {
-            switch (type) {
-                case "customer.subscription.created":
-                case "customer.subscription.updated": {
-                    Subscription sub = (Subscription) event.getDataObjectDeserializer()
-                            .getObject().orElse(null);
-                    if (sub != null) {
-                        handleSubscriptionChange(sub);
-                    }
-                    break;
-                }
-
-                case "customer.subscription.deleted": {
-                    Subscription sub = (Subscription) event.getDataObjectDeserializer()
-                            .getObject().orElse(null);
-                    if (sub != null) {
-                        handleSubscriptionDeleted(sub);
-                    }
-                    break;
-                }
-
-                // Por si sólo estás recibiendo checkout.session.completed
-                case "checkout.session.completed": {
-                    Session session = (Session) event.getDataObjectDeserializer()
-                            .getObject().orElse(null);
-                    if (session != null) {
-                        String subscriptionId = session.getSubscription();
-                        System.out.println("[StripeWebhook] checkout.session.completed subscriptionId=" + subscriptionId);
-                        if (subscriptionId != null) {
-                            Subscription sub = Subscription.retrieve(subscriptionId);
-                            handleSubscriptionChange(sub);
-                        }
-                    }
-                    break;
-                }
-
-                default:
-                    System.out.println("[StripeWebhook] Evento ignorado: " + type);
-            }
-        } catch (StripeException e) {
-            e.printStackTrace();
-            return ResponseEntity.status(500).body("Error procesando webhook");
+        switch (event.getType()) {
+            case "customer.subscription.created":
+            case "customer.subscription.updated":
+            case "customer.subscription.deleted":
+                handleSubscriptionEvent(event);
+                break;
+            default:
+                log.info("[StripeWebhook] Tipo de evento ignorado: {}", event.getType());
         }
 
         return ResponseEntity.ok("ok");
     }
 
-    private void handleSubscriptionChange(Subscription sub) {
+    private void handleSubscriptionEvent(Event event) {
+        var deserializer = event.getDataObjectDeserializer();
+        Subscription sub = (Subscription) deserializer.getObject().orElse(null);
+
+        if (sub == null) {
+            log.warn("[StripeWebhook] subscription event sin objeto (id={})", event.getId());
+            return;
+        }
+
         String customerId = sub.getCustomer();
-        String status = sub.getStatus(); // active, trialing, canceled, unpaid, etc.
+        String status = sub.getStatus();
+        String subscriptionId = sub.getId();
 
-        System.out.println("[StripeWebhook] subscription change customer=" + customerId + " status=" + status);
+        log.info("[StripeWebhook] subscription: type={} customerId={} status={} subId={}",
+                event.getType(), customerId, status, subscriptionId);
 
-        Optional<Usuario> opt = usuarioRepository
-                .findAll().stream()
-                .filter(u -> customerId.equals(u.getStripeCustomerId()))
-                .findFirst();
+        if (customerId == null || customerId.isBlank()) {
+            log.warn("[StripeWebhook] subscription sin customerId");
+            return;
+        }
 
+        Optional<Usuario> opt = usuarioRepository.findByStripeCustomerId(customerId);
         if (opt.isEmpty()) {
-            System.out.println("[StripeWebhook] No se encontró usuario con stripe_customer_id=" + customerId);
+            log.warn("[StripeWebhook] No encontré usuario con stripeCustomerId={}", customerId);
             return;
         }
 
         Usuario u = opt.get();
-        u.setStripeSubscriptionId(sub.getId());
+        u.setStripeSubscriptionId(subscriptionId);
         u.setSubscriptionStatus(status);
 
         if ("active".equals(status) || "trialing".equals(status)) {
             u.setPlan(PlanTipo.PREMIUM);
-        } else if ("canceled".equals(status) || "unpaid".equals(status)) {
+        } else if ("canceled".equals(status)
+                || "unpaid".equals(status)
+                || "incomplete_expired".equals(status)) {
             u.setPlan(PlanTipo.FREE);
         }
 
         usuarioRepository.save(u);
-        System.out.println("[StripeWebhook] Usuario " + u.getIdUsuario() +
-                " actualizado, plan=" + u.getPlan() +
-                ", status=" + u.getSubscriptionStatus());
-    }
-
-    private void handleSubscriptionDeleted(Subscription sub) {
-        String customerId = sub.getCustomer();
-        System.out.println("[StripeWebhook] subscription deleted customer=" + customerId);
-
-        Optional<Usuario> opt = usuarioRepository
-                .findAll().stream()
-                .filter(u -> customerId.equals(u.getStripeCustomerId()))
-                .findFirst();
-
-        if (opt.isEmpty()) {
-            System.out.println("[StripeWebhook] No se encontró usuario con stripe_customer_id=" + customerId);
-            return;
-        }
-
-        Usuario u = opt.get();
-        u.setStripeSubscriptionId(null);
-        u.setSubscriptionStatus("canceled");
-        u.setPlan(PlanTipo.FREE);
-        usuarioRepository.save(u);
-
-        System.out.println("[StripeWebhook] Usuario " + u.getIdUsuario() +
-                " pasado a FREE por subscription.deleted");
+        log.info("[StripeWebhook] Usuario {} actualizado. plan={}, subscriptionStatus={}",
+                u.getIdUsuario(), u.getPlan(), u.getSubscriptionStatus());
     }
 }

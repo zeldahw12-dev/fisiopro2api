@@ -9,6 +9,7 @@ import com.stripe.param.CustomerCreateParams;
 import com.stripe.param.checkout.SessionCreateParams;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
 @Service
 public class StripeService {
 
@@ -24,7 +25,7 @@ public class StripeService {
         this.usuarioRepository = usuarioRepository;
     }
 
-    // Crea (o reutiliza) el Customer de Stripe
+    // Crea (o reutiliza) el Customer de Stripe y LO GUARDA en la BD
     public String ensureCustomer(Usuario usuario) throws StripeException {
         if (usuario.getStripeCustomerId() != null &&
                 !usuario.getStripeCustomerId().isBlank()) {
@@ -38,16 +39,15 @@ public class StripeService {
 
         Customer customer = Customer.create(params);
 
-        // ✅ Guardar el customerId en la BD
         usuario.setStripeCustomerId(customer.getId());
-        usuarioRepository.save(usuario);
+        usuarioRepository.save(usuario); // 👈 MUY IMPORTANTE
 
         return customer.getId();
     }
 
     public Session createSubscriptionCheckoutSession(
             Usuario usuario,
-            String planType,
+            String planType,  // "MONTHLY" o "QUARTERLY"
             String successUrl,
             String cancelUrl
     ) throws StripeException {
