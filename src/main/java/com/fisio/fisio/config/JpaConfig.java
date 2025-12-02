@@ -9,6 +9,8 @@ import java.util.Map;
 /**
  * Fuerza timezone UTC en JDBC/Hibernate para evitar desfases entre servidor y móvil.
  * (Requiere que guardes/recuperes en UTC en el cliente o conviertas en la app).
+ *
+ * 🔐 Tip: tener todo en UTC reduce bugs de tiempo que a veces se confunden con fallos de seguridad.
  */
 @Configuration
 public class JpaConfig {

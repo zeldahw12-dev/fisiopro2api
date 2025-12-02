@@ -19,6 +19,10 @@ import java.util.List;
  *
  * Si se deja vacío o "*", permite todo (útil para desarrollo).
  * Como sólo usas app móvil (sin cookies), `allowCredentials=false` es correcto.
+ *
+ * 🔐 Sugerencia para producción:
+ *   - NO dejes "*" en CORS_ALLOWED_ORIGINS.
+ *   - Pon sólo los esquemas/orígenes reales de tu app (ej. https://fisiopro.app).
  */
 @Configuration
 public class CorsConfig {

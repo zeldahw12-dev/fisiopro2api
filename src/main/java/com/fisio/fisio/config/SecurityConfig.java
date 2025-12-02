@@ -1,5 +1,6 @@
 package com.fisio.fisio.config;
 
+import io.github.bucket4j.Bucket;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jws;
@@ -31,35 +32,48 @@ import org.springframework.util.StringUtils;
 import javax.crypto.SecretKey;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.Key;
+import java.security.KeyFactory;
+import java.security.PublicKey;
+import java.security.spec.X509EncodedKeySpec;
+import java.time.Duration;
+import java.util.Base64;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
-    /**
-     * ⚙️ Si es true → no se exige JWT (modo desarrollo).
-     * ⚙️ Si es false → exige JWT en endpoints no públicos.
-     *
-     * Para producción: APP_SECURITY_PERMIT_ALL=false
-     */
     @Value("${app.security.permit-all:true}")
     private boolean permitAll;
 
-    /** 🔐 Llave para firmar/verificar JWT.
-     *  Para producción: APP_JWT_SECRET=una_clave_laaarga_random_32+_chars
-     */
     @Value("${app.jwt.secret:dev-secret-please-change-and-set-env}")
     private String jwtSecret;
 
-    /** (Opcional) Issuer del token: APP_JWT_ISSUER=fisiopro */
     @Value("${app.jwt.issuer:}")
     private String jwtIssuer;
 
-    /** Endpoints siempre públicos (login/signup, cambio de email y salud) */
+    @Value("${app.jwt.algorithm:HS256}")
+    private String jwtAlgorithm;
+
+    @Value("${app.jwt.public-key-base64:}")
+    private String jwtPublicKeyBase64;
+
+    @Value("${app.security.rate-limit.enabled:true}")
+    private boolean rateLimitEnabled;
+
+    @Value("${app.security.rate-limit.capacity:100}")
+    private long rateLimitCapacity;
+
+    @Value("${app.security.rate-limit.refill-per-seconds:60}")
+    private long rateLimitRefillSeconds;
+
     private static final String[] PUBLIC_ENDPOINTS = {
             "/auth/**",
             "/usuarios/email/**",
@@ -77,12 +91,21 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         System.out.println("[SecurityConfig] permitAll=" + permitAll);
+        System.out.println("[SecurityConfig] jwtAlgorithm=" + jwtAlgorithm);
+        System.out.println("[SecurityConfig] rateLimitEnabled=" + rateLimitEnabled);
 
         http
-                // API REST + JWT → sin CSRF
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(Customizer.withDefaults())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+
+        // 🚦 Rate limiting (antes que cualquier otra cosa)
+        if (rateLimitEnabled) {
+            http.addFilterBefore(
+                    new RateLimitingFilter(rateLimitCapacity, rateLimitRefillSeconds),
+                    UsernamePasswordAuthenticationFilter.class
+            );
+        }
 
         if (permitAll) {
             System.out.println("[SecurityConfig] All routes are open ✅ (modo desarrollo)");
@@ -97,31 +120,53 @@ public class SecurityConfig {
                     .anyRequest().authenticated()
             );
 
-            // Sólo agregamos filtro JWT cuando realmente protegemos
+            Key verificationKey = buildVerificationKey();
             http.addFilterBefore(
-                    new JwtAuthFilter(jwtSecret, jwtIssuer),
+                    new JwtAuthFilter(verificationKey, jwtIssuer),
                     UsernamePasswordAuthenticationFilter.class
             );
         }
 
-        // Útil si usas H2/frames, sino no molesta
         http.headers(headers -> headers.frameOptions(frame -> frame.disable()));
 
         return http.build();
     }
 
-    /** 🧩 Filtro JWT: valida el Bearer token y autentica al usuario. */
-    static class JwtAuthFilter extends org.springframework.web.filter.OncePerRequestFilter {
-        private final SecretKey key;
-        private final String issuer;
+    private Key buildVerificationKey() {
+        try {
+            if ("RS256".equalsIgnoreCase(jwtAlgorithm)) {
+                if (!StringUtils.hasText(jwtPublicKeyBase64)) {
+                    throw new IllegalStateException("app.jwt.algorithm=RS256 pero app.jwt.public-key-base64 está vacío");
+                }
+                byte[] decoded = Base64.getDecoder().decode(jwtPublicKeyBase64);
+                X509EncodedKeySpec spec = new X509EncodedKeySpec(decoded);
+                KeyFactory kf = KeyFactory.getInstance("RSA");
+                PublicKey publicKey = kf.generatePublic(spec);
+                System.out.println("[SecurityConfig] Usando RSA pública para verificar JWT (RS256)");
+                return publicKey;
+            }
 
-        JwtAuthFilter(String secret, String issuer) {
-            if (!StringUtils.hasText(secret) || secret.length() < 32) {
+            if (!StringUtils.hasText(jwtSecret) || jwtSecret.length() < 32) {
                 throw new IllegalStateException(
                         "app.jwt.secret es demasiado corto. Usa un secreto de al menos 32 caracteres en producción."
                 );
             }
-            this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+            SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+            System.out.println("[SecurityConfig] Usando HMAC (HS256) para JWT");
+            return key;
+
+        } catch (GeneralSecurityException e) {
+            throw new IllegalStateException("Error al construir la clave de verificación JWT", e);
+        }
+    }
+
+    /** 🔐 Filtro JWT */
+    static class JwtAuthFilter extends org.springframework.web.filter.OncePerRequestFilter {
+        private final Key key;
+        private final String issuer;
+
+        JwtAuthFilter(Key key, String issuer) {
+            this.key = key;
             this.issuer = (issuer == null || issuer.isBlank()) ? null : issuer;
         }
 
@@ -133,7 +178,6 @@ public class SecurityConfig {
 
             String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
 
-            // Si no hay Authorization, seguimos cadena normalmente (puede ser endpoint público)
             if (!StringUtils.hasText(authHeader) || !authHeader.startsWith("Bearer ")) {
                 filterChain.doFilter(request, response);
                 return;
@@ -148,7 +192,6 @@ public class SecurityConfig {
 
                 Claims claims = jws.getBody();
 
-                // Validar issuer si se configuró
                 if (issuer != null && !issuer.equals(claims.getIssuer())) {
                     throw new JwtException("Invalid issuer");
                 }
@@ -169,21 +212,17 @@ public class SecurityConfig {
                 org.springframework.security.core.context.SecurityContextHolder
                         .getContext().setAuthentication(authentication);
 
-                // Si todo salió bien, continuamos
                 filterChain.doFilter(request, response);
 
             } catch (ExpiredJwtException ex) {
-                // Token expirado → 401
                 org.springframework.security.core.context.SecurityContextHolder.clearContext();
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.getWriter().write("Token expirado");
             } catch (JwtException ex) {
-                // Token mal formado / firma inválida / issuer inválido → 401
                 org.springframework.security.core.context.SecurityContextHolder.clearContext();
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.getWriter().write("Token inválido");
             } catch (Exception ex) {
-                // Cualquier otro error → 401 genérico
                 org.springframework.security.core.context.SecurityContextHolder.clearContext();
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.getWriter().write("Error al validar token");
@@ -201,6 +240,53 @@ public class SecurityConfig {
                         .collect(Collectors.toList());
             }
             return List.of();
+        }
+    }
+
+    /** 🚦 Rate limiting por IP usando Bucket4j (API nueva con Bucket.builder()) */
+    static class RateLimitingFilter extends org.springframework.web.filter.OncePerRequestFilter {
+
+        private final Map<String, Bucket> cache = new ConcurrentHashMap<>();
+        private final long capacity;
+        private final long refillSeconds;
+
+        RateLimitingFilter(long capacity, long refillSeconds) {
+            this.capacity = capacity;
+            this.refillSeconds = refillSeconds;
+        }
+
+        @Override
+        protected void doFilterInternal(HttpServletRequest request,
+                                        HttpServletResponse response,
+                                        FilterChain filterChain)
+                throws ServletException, IOException {
+
+            String ip = resolveClientIp(request);
+            Bucket bucket = cache.computeIfAbsent(ip, this::newBucket);
+
+            if (bucket.tryConsume(1)) {
+                filterChain.doFilter(request, response);
+            } else {
+                response.setStatus(429);
+                response.getWriter().write("Too Many Requests");
+            }
+        }
+
+        /** ⚠️ Aquí ya NO usamos Bucket4j, sino Bucket.builder() */
+        private Bucket newBucket(String key) {
+            return Bucket.builder()
+                    .addLimit(limit -> limit
+                            .capacity(capacity)
+                            .refillIntervally(capacity, Duration.ofSeconds(refillSeconds)))
+                    .build();
+        }
+
+        private String resolveClientIp(HttpServletRequest request) {
+            String forwarded = request.getHeader("X-Forwarded-For");
+            if (StringUtils.hasText(forwarded)) {
+                return forwarded.split(",")[0].trim();
+            }
+            return request.getRemoteAddr();
         }
     }
 }
