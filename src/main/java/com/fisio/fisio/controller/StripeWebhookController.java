@@ -1,32 +1,39 @@
 package com.fisio.fisio.controller;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fisio.fisio.model.PlanTipo;
 import com.fisio.fisio.model.Usuario;
 import com.fisio.fisio.repository.UsuarioRepository;
 import com.stripe.exception.SignatureVerificationException;
 import com.stripe.model.Event;
-import com.stripe.model.Subscription;
 import com.stripe.net.Webhook;
 import jakarta.transaction.Transactional;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.IOException;
 import java.util.Optional;
 
 @RestController
 @RequestMapping("/stripe")
-@Slf4j
 public class StripeWebhookController {
+
+    private static final Logger log = LoggerFactory.getLogger(StripeWebhookController.class);
 
     @Value("${stripe.webhook-secret}")
     private String endpointSecret;
 
     private final UsuarioRepository usuarioRepository;
+    private final ObjectMapper objectMapper;
 
-    public StripeWebhookController(UsuarioRepository usuarioRepository) {
+    public StripeWebhookController(UsuarioRepository usuarioRepository,
+                                   ObjectMapper objectMapper) {
         this.usuarioRepository = usuarioRepository;
+        this.objectMapper = objectMapper;
     }
 
     @PostMapping("/webhook")
@@ -44,6 +51,7 @@ public class StripeWebhookController {
 
         Event event;
         try {
+            // ✅ Verificamos firma
             event = Webhook.constructEvent(payload, sigHeader, endpointSecret);
         } catch (SignatureVerificationException e) {
             log.warn("[StripeWebhook] Firma inválida: {}", e.getMessage());
@@ -56,7 +64,7 @@ public class StripeWebhookController {
             case "customer.subscription.created":
             case "customer.subscription.updated":
             case "customer.subscription.deleted":
-                handleSubscriptionEvent(event);
+                handleSubscriptionEvent(event, payload);
                 break;
             default:
                 log.info("[StripeWebhook] Tipo de evento ignorado: {}", event.getType());
@@ -65,47 +73,49 @@ public class StripeWebhookController {
         return ResponseEntity.ok("ok");
     }
 
-    private void handleSubscriptionEvent(Event event) {
-        var deserializer = event.getDataObjectDeserializer();
-        Subscription sub = (Subscription) deserializer.getObject().orElse(null);
+    private void handleSubscriptionEvent(Event event, String payload) {
+        try {
+            // 👇 Parseamos el JSON crudo del webhook con Jackson
+            JsonNode root = objectMapper.readTree(payload);
+            JsonNode obj = root.path("data").path("object");
 
-        if (sub == null) {
-            log.warn("[StripeWebhook] subscription event sin objeto (id={})", event.getId());
-            return;
+            String customerId = obj.path("customer").asText(null);
+            String status = obj.path("status").asText(null);
+            String subscriptionId = obj.path("id").asText(null);
+
+            log.info("[StripeWebhook] subscription raw: type={} customerId={} status={} subId={}",
+                    event.getType(), customerId, status, subscriptionId);
+
+            if (customerId == null || customerId.isBlank()) {
+                log.warn("[StripeWebhook] subscription sin customerId, abortando");
+                return;
+            }
+
+            // 🔍 Buscar usuario por stripeCustomerId
+            Optional<Usuario> opt = usuarioRepository.findByStripeCustomerId(customerId);
+            if (opt.isEmpty()) {
+                log.warn("[StripeWebhook] No encontré usuario con stripeCustomerId={}", customerId);
+                return;
+            }
+
+            Usuario u = opt.get();
+            u.setStripeSubscriptionId(subscriptionId);
+            u.setSubscriptionStatus(status);
+
+            if ("active".equals(status) || "trialing".equals(status)) {
+                u.setPlan(PlanTipo.PREMIUM);
+            } else if ("canceled".equals(status)
+                    || "unpaid".equals(status)
+                    || "incomplete_expired".equals(status)) {
+                u.setPlan(PlanTipo.FREE);
+            }
+
+            usuarioRepository.save(u);
+            log.info("[StripeWebhook] Usuario {} actualizado. plan={}, subscriptionStatus={}",
+                    u.getIdUsuario(), u.getPlan(), u.getSubscriptionStatus());
+
+        } catch (IOException e) {
+            log.error("[StripeWebhook] Error parseando payload JSON", e);
         }
-
-        String customerId = sub.getCustomer();
-        String status = sub.getStatus();
-        String subscriptionId = sub.getId();
-
-        log.info("[StripeWebhook] subscription: type={} customerId={} status={} subId={}",
-                event.getType(), customerId, status, subscriptionId);
-
-        if (customerId == null || customerId.isBlank()) {
-            log.warn("[StripeWebhook] subscription sin customerId");
-            return;
-        }
-
-        Optional<Usuario> opt = usuarioRepository.findByStripeCustomerId(customerId);
-        if (opt.isEmpty()) {
-            log.warn("[StripeWebhook] No encontré usuario con stripeCustomerId={}", customerId);
-            return;
-        }
-
-        Usuario u = opt.get();
-        u.setStripeSubscriptionId(subscriptionId);
-        u.setSubscriptionStatus(status);
-
-        if ("active".equals(status) || "trialing".equals(status)) {
-            u.setPlan(PlanTipo.PREMIUM);
-        } else if ("canceled".equals(status)
-                || "unpaid".equals(status)
-                || "incomplete_expired".equals(status)) {
-            u.setPlan(PlanTipo.FREE);
-        }
-
-        usuarioRepository.save(u);
-        log.info("[StripeWebhook] Usuario {} actualizado. plan={}, subscriptionStatus={}",
-                u.getIdUsuario(), u.getPlan(), u.getSubscriptionStatus());
     }
 }
